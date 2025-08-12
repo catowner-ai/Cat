@@ -12,7 +12,24 @@ type Quest = { id: string; title: string; minutes: number; steps: string[] };
 
 type QuestResponse = { quest: Quest };
 
-type TabKey = 'bingo' | 'snap' | 'quest';
+type PetType = 'cat' | 'dog' | 'fox' | 'panda' | 'dragon';
+
+type Pet = {
+  playerId: string;
+  name: string;
+  type: PetType;
+  level: number;
+  xp: number;
+  xpToNext: number;
+  happiness: number;
+  hunger: number;
+  streakDays: number;
+  lastCheckin: string;
+};
+
+type PetResponse = { ok: boolean; pet: Pet };
+
+type TabKey = 'bingo' | 'snap' | 'quest' | 'pet';
 
 type Lang = 'en' | 'zh';
 
@@ -21,6 +38,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     bingo: 'Bingo',
     snap: 'SnapSwap',
     quest: 'Quest',
+    pet: 'Pet',
     walkBingoTitle: 'WalkBingo',
     walkBingoDesc: 'Find real‑world items on a 5×5 board. Tap to mark what you spot.',
     progress: 'Progress',
@@ -32,11 +50,23 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     questMinutes: 'minutes',
     luckySpin: 'Lucky Spin',
     copied: 'Copied your progress!',
+    petTitle: 'Your Buddy',
+    feed: 'Feed',
+    play: 'Play',
+    rename: 'Rename',
+    save: 'Save',
+    type: 'Type',
+    level: 'Level',
+    happiness: 'Happiness',
+    hunger: 'Hunger',
+    streak: 'Streak',
+    checkin: 'Daily check‑in',
   },
   zh: {
     bingo: '賓果',
     snap: '盲拍互換',
     quest: '任務',
+    pet: '寵物',
     walkBingoTitle: '走走賓果',
     walkBingoDesc: '在 5×5 棋盤找生活物件，點一下標記發現。',
     progress: '進度',
@@ -48,6 +78,17 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     questMinutes: '分鐘',
     luckySpin: '幸運轉盤',
     copied: '已複製你的進度！',
+    petTitle: '你的夥伴',
+    feed: '餵食',
+    play: '玩耍',
+    rename: '改名',
+    save: '儲存',
+    type: '品種',
+    level: '等級',
+    happiness: '快樂',
+    hunger: '飢餓',
+    streak: '連續天數',
+    checkin: '每日簽到',
   },
 };
 
@@ -65,11 +106,8 @@ function countCompletedLines(tiles: BingoItem[]): number {
     Array.from({ length: 5 }, (_, c) => tiles[r * 5 + c].found)
   );
   let lines = 0;
-  // rows
   for (let r = 0; r < 5; r++) if (grid[r].every(Boolean)) lines++;
-  // cols
   for (let c = 0; c < 5; c++) if (grid.every((row) => row[c])) lines++;
-  // diagonals
   if ([0, 1, 2, 3, 4].every((i) => grid[i][i])) lines++;
   if ([0, 1, 2, 3, 4].every((i) => grid[i][4 - i])) lines++;
   return lines;
@@ -90,6 +128,10 @@ export default function Home() {
   const [nickname, setNickname] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('global');
   const [matchInfo, setMatchInfo] = useState<string>('');
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [petLoading, setPetLoading] = useState<boolean>(false);
+  const [petNameInput, setPetNameInput] = useState<string>('');
+  const [petType, setPetType] = useState<PetType>('cat');
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -166,7 +208,29 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // reload leaderboard if room changes
+    (async () => {
+      if (!nickname) return;
+      try {
+        setPetLoading(true);
+        const res = await fetch(`/api/pet?playerId=${encodeURIComponent(nickname)}`, { cache: 'no-store' });
+        const data: PetResponse = await res.json();
+        setPet(data.pet);
+        setPetNameInput(data.pet.name);
+        setPetType(data.pet.type);
+        await fetch('/api/pet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: nickname, action: 'checkin' }),
+        });
+        const refreshed = await fetch(`/api/pet?playerId=${encodeURIComponent(nickname)}`);
+        const rd: PetResponse = await refreshed.json();
+        setPet(rd.pet);
+      } catch {}
+      finally { setPetLoading(false); }
+    })();
+  }, [nickname]);
+
+  useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`, { cache: 'no-store' });
@@ -182,13 +246,28 @@ export default function Home() {
       fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: 'demo-web', questsInc: 1 }),
+        body: JSON.stringify({ playerId: nickname || 'guest', roomId, questsInc: 1 }),
       }).catch(() => {});
+      // grant pet xp/happiness for doing a quest
+      if (nickname) {
+        fetch('/api/pet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 10, happiness: 3 }),
+        }).catch(() => {});
+      }
     }
-  }, [activeTab, questCounted]);
+  }, [activeTab, questCounted, nickname, roomId]);
 
   const foundCount = useMemo(() => board.filter((b) => b.found).length, [board]);
   const lineCount = useMemo(() => countCompletedLines(board), [board]);
+
+  const refreshPet = async () => {
+    if (!nickname) return;
+    const r = await fetch(`/api/pet?playerId=${encodeURIComponent(nickname)}`);
+    const d: PetResponse = await r.json();
+    setPet(d.pet);
+  };
 
   const onTileToggle = (id: string) => {
     setBoard((prev) => prev.map((t) => (t.id === id ? { ...t, found: !t.found } : t)));
@@ -203,6 +282,14 @@ export default function Home() {
           body: JSON.stringify({ playerId: nickname || 'guest', roomId, lines }),
         });
       } catch {}
+      // small pet reward for exploration
+      if (nickname) {
+        fetch('/api/pet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 1, happiness: 1 }),
+        }).then(refreshPet).catch(() => {});
+      }
     }, 0);
   };
 
@@ -234,6 +321,17 @@ export default function Home() {
     setTimeout(() => setSpinning(false), 1200);
   };
 
+  const PetFace = ({ type }: { type: PetType }) => {
+    const map: Record<PetType, string> = {
+      cat: '🐱',
+      dog: '🐶',
+      fox: '🦊',
+      panda: '🐼',
+      dragon: '🐲',
+    };
+    return <span style={{ fontSize: 48 }}>{map[type] || '🐾'}</span>;
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -255,6 +353,12 @@ export default function Home() {
             className={`px-4 py-2 rounded-full border text-sm ${activeTab === 'quest' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-transparent'}`}
           >
             {t('quest')}
+          </button>
+          <button
+            onClick={() => setActiveTab('pet')}
+            className={`px-4 py-2 rounded-full border text-sm ${activeTab === 'pet' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-transparent'}`}
+          >
+            {t('pet')}
           </button>
         </div>
         <div className="flex items-center gap-1 text-sm">
@@ -346,6 +450,13 @@ export default function Home() {
                       if (d.ready) {
                         setPeerImage(d.partner.image);
                         setMatchInfo('Matched with ' + (d.partner.playerId || 'someone'));
+                        if (nickname) {
+                          fetch('/api/pet', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 8, happiness: 4 }),
+                          }).then(refreshPet).catch(() => {});
+                        }
                       } else {
                         setMatchInfo('Not ready yet, try again in a moment.');
                       }
@@ -365,7 +476,7 @@ export default function Home() {
             )}
           </div>
         </section>
-      ) : (
+      ) : activeTab === 'quest' ? (
         <section>
           <h1 className="text-2xl font-semibold tracking-tight mb-2">{t('questTitle')}</h1>
           {quest ? (
@@ -397,9 +508,57 @@ export default function Home() {
             </ul>
           </div>
         </section>
+      ) : (
+        <section>
+          <h1 className="text-2xl font-semibold tracking-tight mb-2">{t('petTitle')}</h1>
+          {!nickname && <div className="text-sm opacity-70 mb-4">Set a nickname to create your pet.</div>}
+          {petLoading && <div className="text-sm opacity-70">Loading…</div>}
+          {pet && (
+            <div className="rounded-xl border p-4 bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <PetFace type={pet.type} />
+                <div>
+                  <div className="text-lg font-medium">{pet.name}</div>
+                  <div className="text-xs opacity-70">{t('level')} {pet.level} · {t('streak')}: {pet.streakDays}</div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="text-xs opacity-70 mb-1">XP {pet.xp} / {pet.xpToNext}</div>
+                <div className="w-full h-2 rounded bg-black/10 dark:bg-white/10">
+                  <div className="h-2 rounded bg-emerald-500" style={{ width: `${Math.min(100, Math.round((pet.xp / Math.max(1, pet.xpToNext)) * 100))}%` }} />
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>{t('happiness')}: {pet.happiness}</div>
+                <div>{t('hunger')}: {pet.hunger}</div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'feed' }) }); await refreshPet(); }}>{t('feed')}</button>
+                <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'play' }) }); await refreshPet(); }}>{t('play')}</button>
+                <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'checkin' }) }); await refreshPet(); }}>{t('checkin')}</button>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                <label className="opacity-70">{t('rename')}</label>
+                <input value={petNameInput} onChange={(e) => setPetNameInput(e.target.value.slice(0,24))} className="px-2 py-1 rounded border bg-transparent" />
+                <button className="px-3 py-1.5 rounded-md border" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'rename', name: petNameInput }) }); await refreshPet(); }}>{t('save')}</button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <label className="opacity-70">{t('type')}</label>
+                <select value={petType} onChange={(e) => setPetType(e.target.value as PetType)} className="px-2 py-1 rounded border bg-transparent">
+                  <option value="cat">cat</option>
+                  <option value="dog">dog</option>
+                  <option value="fox">fox</option>
+                  <option value="panda">panda</option>
+                  <option value="dragon">dragon</option>
+                </select>
+                <button className="px-3 py-1.5 rounded-md border" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'selecttype', type: petType }) }); await refreshPet(); }}>{t('save')}</button>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
-      <footer className="mt-10 text-xs opacity-60">QuestBingo · Walk • Snap · Play</footer>
+      <footer className="mt-10 text-xs opacity-60">QuestBingo · Walk · Snap · Play</footer>
     </div>
   );
 }
