@@ -61,6 +61,7 @@ export async function POST(req: Request) {
     room.matches[partner.playerId] = mine;
     store.rooms[roomId] = room;
     await writeStore(store);
+    try { const mod = await import('../../_events'); (mod as any).publish(roomId, { type: 'match', roomId, players: [playerId, partner.playerId] }); } catch {}
     return NextResponse.json({ ok: true, matched: true });
   }
 
