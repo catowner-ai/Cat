@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_BASE = 'http://localhost:3000'; // Change if your web server runs elsewhere
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE || 'http://localhost:3000'; // Change if your web server runs elsewhere
 
 type BingoItem = { id: string; label: string; found: boolean };
 type Quest = { id: string; title: string; minutes: number; steps: string[] };
