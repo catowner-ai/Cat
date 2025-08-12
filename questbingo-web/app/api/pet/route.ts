@@ -155,5 +155,6 @@ export async function POST(req: Request) {
   }
 
   await writeStore(store);
+  try { const mod = await import('../_events'); (mod as { publish: (room: string, ev: unknown) => void }).publish('global', { type: 'pet', playerId, pet: { level: pet.level, happiness: pet.happiness } }); } catch {}
   return NextResponse.json({ ok: true, pet });
 }

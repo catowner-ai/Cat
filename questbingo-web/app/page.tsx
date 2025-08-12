@@ -132,6 +132,9 @@ export default function Home() {
   const [petLoading, setPetLoading] = useState<boolean>(false);
   const [petNameInput, setPetNameInput] = useState<string>('');
   const [petType, setPetType] = useState<PetType>('cat');
+  const [eventsLog, setEventsLog] = useState<string[]>([]);
+  const [boss, setBoss] = useState<{ id: string; title: string; type: string; threshold: number } | null>(null);
+  const [guessInput, setGuessInput] = useState<string>('');
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -258,6 +261,29 @@ export default function Home() {
       }
     }
   }, [activeTab, questCounted, nickname, roomId]);
+
+  useEffect(() => {
+    // Boss of the day
+    fetch('/api/boss').then((r) => r.json()).then((d) => setBoss(d.boss)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // SSE subscribe
+    const url = `/api/events?room=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(nickname || 'guest')}`;
+    const es = new EventSource(url);
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        setEventsLog((prev) => [JSON.stringify(data), ...prev].slice(0, 5));
+        if (data.type === 'leaderboard') {
+          // refresh leaderboard
+          fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`).then((r) => r.json()).then((d) => setLeaderboard((d.entries || []).slice(0,5))).catch(() => {});
+        }
+      } catch {}
+    };
+    es.onerror = () => {};
+    return () => es.close();
+  }, [roomId, nickname]);
 
   const foundCount = useMemo(() => board.filter((b) => b.found).length, [board]);
   const lineCount = useMemo(() => countCompletedLines(board), [board]);
@@ -469,9 +495,24 @@ export default function Home() {
               </div>
             )}
             {peerImage && (
-              <div className="mt-4">
+              <div className="mt-4 space-y-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={peerImage} alt="Peer" className="max-h-60 rounded-lg border" />
+                <div className="flex items-center gap-2">
+                  <input className="px-2 py-1 rounded border bg-transparent text-sm" placeholder="Guess author nickname" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} />
+                  <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => {
+                    const r = await fetch('/api/snapswap/guess', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname || 'guest', roomId, guess: guessInput }) });
+                    const d = await r.json();
+                    if (d.correct) {
+                      setMatchInfo('Correct! Partner is ' + d.partner.playerId);
+                      if (nickname) {
+                        fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 12, happiness: 5 }) }).then(refreshPet).catch(() => {});
+                      }
+                    } else {
+                      setMatchInfo('Wrong guess, try again.');
+                    }
+                  }}>Guess</button>
+                </div>
               </div>
             )}
           </div>
@@ -506,6 +547,21 @@ export default function Home() {
                 <li className="text-xs opacity-60">No entries yet. Be the first!</li>
               )}
             </ul>
+          </div>
+          <div className="mt-6 rounded-xl border p-4 bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
+            <div className="text-sm opacity-70 mb-1">Boss of the day</div>
+            <div className="text-sm">{boss ? boss.title : 'Loading…'}</div>
+            <button className="mt-2 px-3 py-1.5 rounded-md border text-sm" onClick={async () => {
+              if (!boss) return;
+              const r = await fetch('/api/boss/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname || 'guest', roomId, bossId: boss.id }) });
+              const d = await r.json();
+              if (d.ok) {
+                alert('Claimed rewards!');
+                await refreshPet();
+              } else {
+                alert('Not ready: ' + (d.reason || 'unknown'));
+              }
+            }}>Claim</button>
           </div>
         </section>
       ) : (
@@ -559,6 +615,11 @@ export default function Home() {
       )}
 
       <footer className="mt-10 text-xs opacity-60">QuestBingo · Walk · Snap · Play</footer>
+      {eventsLog.length > 0 && (
+        <div className="mt-4 text-xs opacity-60">
+          Events: {eventsLog.join(' | ')}
+        </div>
+      )}
     </div>
   );
 }

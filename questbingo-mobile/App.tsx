@@ -73,6 +73,8 @@ export default function App() {
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [peerImage, setPeerImage] = useState<string | null>(null);
+  const [guessInput, setGuessInput] = useState<string>('');
+  const [boss, setBoss] = useState<{ id: string; title: string } | null>(null);
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [petType, setPetType] = useState<PetType>('cat');
@@ -91,6 +93,11 @@ export default function App() {
         const r = await fetch(`${API_BASE}/api/quests`);
         const d = await r.json();
         setQuest(d.quest);
+      } catch {}
+      try {
+        const r = await fetch(`${API_BASE}/api/boss`);
+        const d = await r.json();
+        setBoss(d.boss);
       } catch {}
     })();
   }, []);
@@ -168,11 +175,40 @@ export default function App() {
       const d = await r.json();
       if (d.ready) {
         setPeerImage(d.partner.image);
-        await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 8, happiness: 4 }) });
+        // reward moved to guess
+      } else {
+        Alert.alert('Not ready yet', 'Try again in a moment.');
+      }
+    } catch {}
+  };
+
+  const guessAuthor = async () => {
+    if (!guessInput) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/snapswap/guess`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, roomId, guess: guessInput }) });
+      const d = await r.json();
+      if (d.correct) {
+        Alert.alert('Correct!', `Partner is ${d.partner.playerId}`);
+        await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 12, happiness: 5 }) });
         const r2 = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`);
         setPet((await r2.json()).pet);
       } else {
-        Alert.alert('Not ready yet', 'Try again in a moment.');
+        Alert.alert('Wrong', 'Try again.');
+      }
+    } catch {}
+  };
+
+  const claimBoss = async () => {
+    if (!boss) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/boss/claim`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, roomId, bossId: boss.id }) });
+      const d = await r.json();
+      if (d.ok) {
+        Alert.alert('Claimed', 'Rewards granted!');
+        const r2 = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`);
+        setPet((await r2.json()).pet);
+      } else {
+        Alert.alert('Not ready', d.reason || 'unknown');
       }
     } catch {}
   };
@@ -240,7 +276,13 @@ export default function App() {
                 <Image source={{ uri: selectedImage }} style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' }} resizeMode="cover" />
               )}
               {peerImage && (
-                <Image source={{ uri: peerImage }} style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' }} resizeMode="cover" />
+                <>
+                  <Image source={{ uri: peerImage }} style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: '#ddd' }} resizeMode="cover" />
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <TextInput value={guessInput} onChangeText={setGuessInput} placeholder="Guess author" style={[styles.input, { flex: 1 }]} />
+                    <TouchableOpacity style={styles.actionBtn} onPress={guessAuthor}><Text>Guess</Text></TouchableOpacity>
+                  </View>
+                </>
               )}
             </View>
           </View>
@@ -259,6 +301,12 @@ export default function App() {
               </View>
             ) : (
               <Text style={styles.subtle}>Loading…</Text>
+            )}
+            {boss && (
+              <View style={[styles.card, { marginTop: 10 }] }>
+                <Text style={styles.subtle}>Boss: {boss.title}</Text>
+                <TouchableOpacity style={[styles.actionBtn, { marginTop: 8 }]} onPress={claimBoss}><Text>Claim</Text></TouchableOpacity>
+              </View>
             )}
           </View>
         )}

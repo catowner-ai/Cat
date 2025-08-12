@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     room.completed[playerId] = dayKey();
     store.rooms[roomId] = room;
     await writeStore(store);
-    try { const mod = await import('../../_events'); (mod as any).publish(roomId, { type: 'reveal', roomId, playerId, partnerId: partnerOffer.playerId }); } catch {}
+    try { const mod = await import('../../_events'); (mod as { publish: (room: string, ev: unknown) => void }).publish(roomId, { type: 'reveal', roomId, playerId, partnerId: partnerOffer.playerId }); } catch {}
     return NextResponse.json({ ok: true, correct: true, partner: { playerId: partnerOffer.playerId } });
   }
   return NextResponse.json({ ok: true, correct: false });

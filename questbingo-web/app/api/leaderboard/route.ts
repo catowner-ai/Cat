@@ -108,5 +108,6 @@ export async function POST(req: Request) {
   }
   entry.updatedAt = new Date().toISOString();
   await writeStore(store);
+  try { const mod = await import('../_events'); (mod as { publish: (room: string, ev: unknown) => void }).publish(roomId, { type: 'leaderboard', roomId, playerId, lines: entry.lines, quests: entry.quests }); } catch {}
   return NextResponse.json({ ok: true, day, room: roomId, entry });
 }

@@ -31,11 +31,6 @@ async function readStore(): Promise<Store> {
   try { return JSON.parse(raw) as Store; } catch { return { rooms: {} }; }
 }
 
-async function writeStore(data: Store) {
-  await ensure();
-  await fs.writeFile(filePath(), JSON.stringify(data, null, 2));
-}
-
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const playerId = (url.searchParams.get('playerId') || '').slice(0, 64);
@@ -48,8 +43,6 @@ export async function GET(req: Request) {
   const partnerOffer = room.matches[playerId];
   if (!partnerOffer) return NextResponse.json({ ok: true, ready: false });
 
-  // One-time retrieval then clear
-  delete room.matches[playerId];
-  await writeStore(store);
-  return NextResponse.json({ ok: true, ready: true, partner: { image: partnerOffer.image, playerId: partnerOffer.playerId } });
+  // Return masked identity; guessing endpoint will reveal
+  return NextResponse.json({ ok: true, ready: true, partner: { image: partnerOffer.image } });
 }

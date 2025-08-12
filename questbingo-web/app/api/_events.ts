@@ -1,8 +1,8 @@
-type RoomClient = { roomId: string; res: WritableStreamDefaultWriter; playerId?: string };
+type RoomClient = { roomId: string; res: WritableStreamDefaultWriter<Uint8Array>; playerId?: string };
 
 const roomsToClients = new Map<string, Set<RoomClient>>();
 
-export function publish(roomId: string, event: any) {
+export function publish(roomId: string, event: unknown) {
   const payload = `data: ${JSON.stringify(event)}\n\n`;
   const set = roomsToClients.get(roomId);
   if (!set) return;
@@ -15,13 +15,13 @@ export function publish(roomId: string, event: any) {
 
 const encoder = new TextEncoder();
 
-export function addClient(roomId: string, res: WritableStreamDefaultWriter, playerId?: string) {
+export function addClient(roomId: string, res: WritableStreamDefaultWriter<Uint8Array>, playerId?: string) {
   const set = roomsToClients.get(roomId) ?? new Set<RoomClient>();
   set.add({ roomId, res, playerId });
   roomsToClients.set(roomId, set);
 }
 
-export function removeClient(roomId: string, res: WritableStreamDefaultWriter) {
+export function removeClient(roomId: string, res: WritableStreamDefaultWriter<Uint8Array>) {
   const set = roomsToClients.get(roomId);
   if (!set) return;
   for (const c of set) {

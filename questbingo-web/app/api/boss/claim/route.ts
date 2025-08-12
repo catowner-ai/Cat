@@ -23,7 +23,7 @@ async function readJSON<T>(p: string, fallback: T): Promise<T> {
 async function ensureDir(p: string) { await fs.mkdir(path.dirname(p), { recursive: true }).catch(() => {}); }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => ({} as { playerId?: string; roomId?: string; bossId?: string }));
   const playerId = String(body.playerId || '').slice(0, 64);
   const roomId = String(body.roomId || 'global').slice(0, 32);
   const bossId = String(body.bossId || '');
@@ -32,15 +32,15 @@ export async function POST(req: Request) {
   const day = dayKey();
   const claimPath = path.join(process.cwd(), '.data', 'boss-claimed.json');
   await ensureDir(claimPath);
-  const claimed = await readJSON<ClaimedStore>(claimPath, {});
+  const claimed = await readJSON<ClaimedStore>(claimPath, {} as ClaimedStore);
   if (claimed[day]?.[playerId]) return NextResponse.json({ ok: false, reason: 'already_claimed' }, { status: 400 });
 
   // Boss rotation identical to /api/boss
   const bosses = [
-    { id: 'lines2', type: 'lines', threshold: 2, rewardXp: 25, rewardHappy: 8 },
-    { id: 'lines3', type: 'lines', threshold: 3, rewardXp: 50, rewardHappy: 12 },
-    { id: 'match1', type: 'match', threshold: 1, rewardXp: 40, rewardHappy: 10 },
-  ] as const;
+    { id: 'lines2', type: 'lines' as const, threshold: 2, rewardXp: 25, rewardHappy: 8 },
+    { id: 'lines3', type: 'lines' as const, threshold: 3, rewardXp: 50, rewardHappy: 12 },
+    { id: 'match1', type: 'match' as const, threshold: 1, rewardXp: 40, rewardHappy: 10 },
+  ];
   const idx = Math.floor((Date.now() - new Date(new Date().getUTCFullYear(), 0, 1).getTime()) / (1000*60*60*24)) % bosses.length;
   const boss = bosses[idx];
   if (boss.id !== bossId) return NextResponse.json({ ok: false, reason: 'boss_mismatch' }, { status: 400 });
@@ -48,11 +48,11 @@ export async function POST(req: Request) {
   let ok = false;
   if (boss.type === 'lines') {
     const lbPath = path.join(process.cwd(), '.data', 'leaderboard.json');
-    const lb = await readJSON<LeaderboardStore>(lbPath, {} as any);
+    const lb = await readJSON<LeaderboardStore>(lbPath, {} as LeaderboardStore);
     const dayData = lb[day];
     let entries: Entry[] = [];
-    if (Array.isArray(dayData)) entries = dayData;
-    else entries = (dayData?.[roomId] ?? []) as Entry[];
+    if (Array.isArray(dayData)) entries = dayData as Entry[];
+    else entries = ((dayData as DayRoomStore)?.[roomId] ?? []) as Entry[];
     const me = entries.find((e) => e.playerId === playerId);
     ok = !!(me && me.lines >= boss.threshold);
   } else if (boss.type === 'match') {

@@ -28,13 +28,10 @@ export async function GET(req: Request) {
     },
   });
 
-  (response as any).headers?.set?.('X-Accel-Buffering', 'no');
+  // Try set header if available
+  try { (response as Response).headers.set('X-Accel-Buffering', 'no'); } catch {}
 
-  (response as any).onclose = () => {
-    clearInterval(heartbeat);
-    removeClient(roomId, writer);
-    writer.close();
-  };
+  // No reliable onclose; rely on client disconnects and GC
 
   return response;
 }
