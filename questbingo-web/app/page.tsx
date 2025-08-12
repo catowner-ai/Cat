@@ -87,14 +87,28 @@ export default function Home() {
   const [leaderboard, setLeaderboard] = useState<{ playerId: string; lines: number; quests: number }[]>([]);
   const [peerImage, setPeerImage] = useState<string | null>(null);
   const [questCounted, setQuestCounted] = useState<boolean>(false);
+  const [nickname, setNickname] = useState<string>('');
+  const [roomId, setRoomId] = useState<string>('global');
+  const [matchInfo, setMatchInfo] = useState<string>('');
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('questbingo.lang', lang);
+      const n = window.localStorage.getItem('questbingo.nickname') || '';
+      const r = window.localStorage.getItem('questbingo.room') || 'global';
+      setNickname(n);
+      setRoomId(r);
     }
-  }, [lang]);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('questbingo.lang', lang);
+      window.localStorage.setItem('questbingo.nickname', nickname);
+      window.localStorage.setItem('questbingo.room', roomId);
+    }
+  }, [lang, nickname, roomId]);
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -131,7 +145,7 @@ export default function Home() {
     };
     const loadLeaderboard = async () => {
       try {
-        const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+        const res = await fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`, { cache: 'no-store' });
         const data = await res.json();
         setLeaderboard((data.entries || []).slice(0, 5));
       } catch {}
@@ -150,6 +164,17 @@ export default function Home() {
     loadLeaderboard();
     loadPeer();
   }, []);
+
+  useEffect(() => {
+    // reload leaderboard if room changes
+    (async () => {
+      try {
+        const res = await fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`, { cache: 'no-store' });
+        const data = await res.json();
+        setLeaderboard((data.entries || []).slice(0, 5));
+      } catch {}
+    })();
+  }, [roomId]);
 
   useEffect(() => {
     if (activeTab === 'quest' && !questCounted) {
@@ -175,7 +200,7 @@ export default function Home() {
         await fetch('/api/leaderboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: 'demo-web', lines }),
+          body: JSON.stringify({ playerId: nickname || 'guest', roomId, lines }),
         });
       } catch {}
     }, 0);
@@ -233,6 +258,8 @@ export default function Home() {
           </button>
         </div>
         <div className="flex items-center gap-1 text-sm">
+          <input value={nickname} onChange={(e) => setNickname(e.target.value.slice(0,24))} placeholder="nickname" className="px-2 py-1 rounded border bg-transparent" />
+          <input value={roomId} onChange={(e) => setRoomId(e.target.value.slice(0,32))} placeholder="room" className="px-2 py-1 rounded border bg-transparent w-28" />
           <button onClick={() => setLang('en')} className={`px-2 py-1 rounded ${lang==='en' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>EN</button>
           <button onClick={() => setLang('zh')} className={`px-2 py-1 rounded ${lang==='zh' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>中文</button>
         </div>
@@ -291,30 +318,42 @@ export default function Home() {
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={selectedImage} alt="Selected" className="max-h-60 rounded-lg border" />
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2 items-center">
                   <button
                     className="px-3 py-1.5 rounded-md border text-sm"
                     onClick={async () => {
-                      await fetch('/api/snapswap', {
+                      setMatchInfo('Offering…');
+                      const r = await fetch('/api/snapswap/offer', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ playerId: 'demo-web', image: selectedImage }),
+                        body: JSON.stringify({ playerId: nickname || 'guest', roomId, image: selectedImage }),
                       });
-                      alert('Uploaded to SnapSwap pool!');
+                      const data = await r.json();
+                      if (data.matched) {
+                        setMatchInfo('Matched! Fetching…');
+                      } else {
+                        setMatchInfo('Waiting for a partner…');
+                      }
                     }}
                   >
-                    Upload to pool
+                    Offer to room
                   </button>
                   <button
                     className="px-3 py-1.5 rounded-md border text-sm"
                     onClick={async () => {
-                      const res = await fetch('/api/snapswap');
-                      const data = await res.json();
-                      setPeerImage(data?.peer?.image || null);
+                      const r = await fetch(`/api/snapswap/match?playerId=${encodeURIComponent(nickname || 'guest')}&roomId=${encodeURIComponent(roomId)}`);
+                      const d = await r.json();
+                      if (d.ready) {
+                        setPeerImage(d.partner.image);
+                        setMatchInfo('Matched with ' + (d.partner.playerId || 'someone'));
+                      } else {
+                        setMatchInfo('Not ready yet, try again in a moment.');
+                      }
                     }}
                   >
-                    Fetch a random peer
+                    Check match
                   </button>
+                  {matchInfo && <span className="text-xs opacity-70">{matchInfo}</span>}
                 </div>
               </div>
             )}

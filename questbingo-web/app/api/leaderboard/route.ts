@@ -11,8 +11,12 @@ type Entry = {
   updatedAt: string;
 };
 
+type DayRoomStore = {
+  [roomId: string]: Entry[];
+};
+
 type Store = {
-  [dayKey: string]: Entry[];
+  [dayKey: string]: DayRoomStore | Entry[]; // keep legacy array for backward compatibility
 };
 
 function getDayKey(d = new Date()) {
@@ -51,28 +55,50 @@ async function writeStore(store: Store) {
   await fs.writeFile(getStorePath(), JSON.stringify(store, null, 2));
 }
 
-export async function GET() {
+function ensureRoom(store: Store, day: string, roomId: string): Entry[] {
+  const dayData = store[day];
+  if (!dayData) {
+    const rooms: DayRoomStore = { [roomId]: [] };
+    store[day] = rooms;
+    return rooms[roomId]!;
+  }
+  if (Array.isArray(dayData)) {
+    // migrate legacy array to room map under 'global'
+    const rooms: DayRoomStore = { global: dayData };
+    store[day] = rooms;
+    rooms[roomId] = rooms[roomId] ?? [];
+    return rooms[roomId]!;
+  }
+  const rooms = dayData as DayRoomStore;
+  rooms[roomId] = rooms[roomId] ?? [];
+  return rooms[roomId]!;
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const roomId = (url.searchParams.get('room') || 'global').slice(0, 32);
   const day = getDayKey();
   const store = await readStore();
-  const entries = (store[day] ?? []).slice().sort((a, b) => b.lines - a.lines).slice(0, 20);
-  return NextResponse.json({ day, entries });
+  const entries = ensureRoom(store, day, roomId).slice().sort((a, b) => b.lines - a.lines).slice(0, 20);
+  return NextResponse.json({ day, room: roomId, entries });
 }
 
 export async function POST(req: Request) {
-  const day = getDayKey();
   const body = await req.json().catch(() => ({}));
   const playerId = String(body.playerId || '').slice(0, 64);
+  const roomId = String(body.roomId || 'global').slice(0, 32);
+  const day = getDayKey();
   const lines = Number.isFinite(body.lines) ? Math.max(0, Math.floor(body.lines)) : undefined;
   const questsInc = Number.isFinite(body.questsInc) ? Math.max(0, Math.floor(body.questsInc)) : 0;
   if (!playerId) {
     return NextResponse.json({ error: 'playerId required' }, { status: 400 });
   }
   const store = await readStore();
-  const todays = store[day] ?? [];
-  let entry = todays.find((e) => e.playerId === playerId);
+  const todaysRoom = ensureRoom(store, day, roomId);
+  let entry = todaysRoom.find((e) => e.playerId === playerId);
   if (!entry) {
     entry = { playerId, lines: 0, quests: 0, updatedAt: new Date().toISOString() };
-    todays.push(entry);
+    todaysRoom.push(entry);
   }
   if (typeof lines === 'number') {
     entry.lines = Math.max(entry.lines, lines);
@@ -81,7 +107,6 @@ export async function POST(req: Request) {
     entry.quests += questsInc;
   }
   entry.updatedAt = new Date().toISOString();
-  store[day] = todays;
   await writeStore(store);
-  return NextResponse.json({ ok: true, day, entry });
+  return NextResponse.json({ ok: true, day, room: roomId, entry });
 }
