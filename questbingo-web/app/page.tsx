@@ -84,6 +84,9 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [quest, setQuest] = useState<Quest | null>(null);
   const [spinning, setSpinning] = useState<boolean>(false);
+  const [leaderboard, setLeaderboard] = useState<{ playerId: string; lines: number; quests: number }[]>([]);
+  const [peerImage, setPeerImage] = useState<string | null>(null);
+  const [questCounted, setQuestCounted] = useState<boolean>(false);
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -126,17 +129,56 @@ export default function Home() {
         setQuest(null);
       }
     };
+    const loadLeaderboard = async () => {
+      try {
+        const res = await fetch('/api/leaderboard', { cache: 'no-store' });
+        const data = await res.json();
+        setLeaderboard((data.entries || []).slice(0, 5));
+      } catch {}
+    };
+    const loadPeer = async () => {
+      try {
+        const res = await fetch('/api/snapswap', { cache: 'no-store' });
+        const data = await res.json();
+        setPeerImage(data?.peer?.image || null);
+      } catch {}
+    };
 
     loadBoard();
     loadPrompt();
     loadQuest();
+    loadLeaderboard();
+    loadPeer();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'quest' && !questCounted) {
+      setQuestCounted(true);
+      fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: 'demo-web', questsInc: 1 }),
+      }).catch(() => {});
+    }
+  }, [activeTab, questCounted]);
 
   const foundCount = useMemo(() => board.filter((b) => b.found).length, [board]);
   const lineCount = useMemo(() => countCompletedLines(board), [board]);
 
   const onTileToggle = (id: string) => {
     setBoard((prev) => prev.map((t) => (t.id === id ? { ...t, found: !t.found } : t)));
+    setTimeout(async () => {
+      const lines = countCompletedLines(
+        board.map((t) => (t.id === id ? { ...t, found: !t.found } : t))
+      );
+      try {
+        await fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: 'demo-web', lines }),
+        });
+      } catch {}
+    }, 0);
   };
 
   const onShare = async () => {
@@ -249,6 +291,37 @@ export default function Home() {
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={selectedImage} alt="Selected" className="max-h-60 rounded-lg border" />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    className="px-3 py-1.5 rounded-md border text-sm"
+                    onClick={async () => {
+                      await fetch('/api/snapswap', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ playerId: 'demo-web', image: selectedImage }),
+                      });
+                      alert('Uploaded to SnapSwap pool!');
+                    }}
+                  >
+                    Upload to pool
+                  </button>
+                  <button
+                    className="px-3 py-1.5 rounded-md border text-sm"
+                    onClick={async () => {
+                      const res = await fetch('/api/snapswap');
+                      const data = await res.json();
+                      setPeerImage(data?.peer?.image || null);
+                    }}
+                  >
+                    Fetch a random peer
+                  </button>
+                </div>
+              </div>
+            )}
+            {peerImage && (
+              <div className="mt-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={peerImage} alt="Peer" className="max-h-60 rounded-lg border" />
               </div>
             )}
           </div>
@@ -269,6 +342,21 @@ export default function Home() {
           ) : (
             <div className="text-sm opacity-70">Loading…</div>
           )}
+
+          <div className="mt-6">
+            <div className="text-sm opacity-70 mb-2">Top 5 Leaderboard (lines)</div>
+            <ul className="text-sm grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {leaderboard.map((e, idx) => (
+                <li key={e.playerId+idx} className="rounded-md border p-2 flex items-center justify-between">
+                  <div className="truncate">{e.playerId}</div>
+                  <div className="opacity-70">{e.lines} lines · {e.quests} quests</div>
+                </li>
+              ))}
+              {leaderboard.length === 0 && (
+                <li className="text-xs opacity-60">No entries yet. Be the first!</li>
+              )}
+            </ul>
+          </div>
         </section>
       )}
 
