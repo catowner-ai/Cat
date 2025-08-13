@@ -74,6 +74,14 @@ export async function POST(req: Request) {
     } else if (kind === 'sticker') {
       if (!w.stickersOwned.includes(itemId)) w.stickersOwned.push(itemId);
     }
+  } else if (action === 'grantitem') {
+    const kind = String(body.kind || '').toLowerCase();
+    const itemId = String(body.itemId || '').toLowerCase();
+    if (kind === 'cosmetic') {
+      if (!w.cosmetics.includes(itemId)) w.cosmetics.push(itemId);
+    } else if (kind === 'sticker') {
+      if (!w.stickersOwned.includes(itemId)) w.stickersOwned.push(itemId);
+    }
   }
 
   await writeStore(store);

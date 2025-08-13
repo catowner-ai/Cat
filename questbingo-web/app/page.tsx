@@ -137,10 +137,12 @@ export default function Home() {
   const [guessInput, setGuessInput] = useState<string>('');
   const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
   const [chatInput, setChatInput] = useState<string>('');
-  const [messages, setMessages] = useState<{ id: string; playerId: string; text: string; createdAt: string }[]>([]);
+  const [messages, setMessages] = useState<{ id: string; playerId: string; text?: string; stickerId?: string; createdAt: string }[]>([]);
   const [coins, setCoins] = useState<number>(0);
   const [equipped, setEquipped] = useState<string>('');
   const [owned, setOwned] = useState<string[]>([]);
+  const [stickers, setStickers] = useState<{ id: string; label: string }[]>([]);
+  const [stickerToSend, setStickerToSend] = useState<string>('');
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -275,6 +277,8 @@ export default function Home() {
     fetch(`/api/chat?room=${encodeURIComponent(roomId)}`).then((r)=>r.json()).then((d)=> setMessages(d.messages || [])).catch(()=>{});
     // Load wallet
     if (nickname) fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`).then((r)=>r.json()).then((d)=>{ setCoins(d.wallet?.coins ?? 0); setEquipped(d.wallet?.equipped ?? ''); setOwned(d.wallet?.cosmetics ?? []); }).catch(()=>{});
+    // Load stickers catalog
+    fetch('/api/stickers').then((r)=>r.json()).then((d)=> setStickers(d.stickers || [])).catch(()=>{});
   }, []);
 
   useEffect(() => {
@@ -604,7 +608,14 @@ export default function Home() {
             <div className="text-sm opacity-70 mb-2">Room chat</div>
             <div className="max-h-48 overflow-auto space-y-1 text-sm mb-2">
               {messages.map((m)=> (
-                <div key={m.id} className="flex gap-2"><span className="opacity-60">{m.playerId}:</span><span>{m.text}</span></div>
+                <div key={m.id} className="flex gap-2">
+                  <span className="opacity-60">{m.playerId}:</span>
+                  {m.stickerId ? (
+                    <span className="px-2 py-0.5 rounded bg-black/10 dark:bg-white/10">:{m.stickerId}:</span>
+                  ) : (
+                    <span>{m.text}</span>
+                  )}
+                </div>
               ))}
               {messages.length===0 && <div className="text-xs opacity-60">No messages</div>}
             </div>
@@ -615,6 +626,17 @@ export default function Home() {
                 await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname || 'guest', text: chatInput.trim() }) });
                 setChatInput('');
               }}>Send</button>
+              <select className="px-2 py-1 rounded border bg-transparent text-sm" value={stickerToSend} onChange={(e)=> setStickerToSend(e.target.value)}>
+                <option value="">Pick sticker</option>
+                {stickers.map((s)=> (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+              <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async ()=>{
+                if (!stickerToSend) return;
+                await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname || 'guest', stickerId: stickerToSend }) });
+                setStickerToSend('');
+              }}>Send sticker</button>
             </div>
           </div>
         </section>

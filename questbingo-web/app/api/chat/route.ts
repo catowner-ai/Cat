@@ -4,7 +4,7 @@ import path from 'path';
 
 export const runtime = 'nodejs';
 
-type Message = { id: string; playerId: string; text: string; createdAt: string };
+type Message = { id: string; playerId: string; text?: string; stickerId?: string; createdAt: string };
 
 type Store = { rooms: Record<string, Message[]> };
 
@@ -32,15 +32,27 @@ export async function GET(req: Request) {
   return NextResponse.json({ room: roomId, messages: list });
 }
 
+async function ownsSticker(playerId: string, stickerId: string): Promise<boolean> {
+  try {
+    const mod = (await import('../wallet/route')) as unknown as { readStore?: () => Promise<{ players: Record<string, { stickersOwned?: string[] }> }> };
+    const store = await mod.readStore?.();
+    if (!store) return true; // fallback allow
+    const w = store.players?.[playerId];
+    return !!w?.stickersOwned?.includes(stickerId);
+  } catch { return true; }
+}
+
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({} as { roomId?: string; playerId?: string; text?: string }));
+  const body = await req.json().catch(() => ({} as { roomId?: string; playerId?: string; text?: string; stickerId?: string }));
   const roomId = String(body.roomId || 'global').slice(0, 32);
   const playerId = String(body.playerId || '').slice(0, 64);
-  const text = String(body.text || '').slice(0, 500);
-  if (!playerId || !text) return NextResponse.json({ error: 'playerId and text required' }, { status: 400 });
+  const text = body.text ? String(body.text).slice(0, 500) : undefined;
+  const stickerId = body.stickerId ? String(body.stickerId).slice(0, 64) : undefined;
+  if (!playerId || (!text && !stickerId)) return NextResponse.json({ error: 'playerId and text or stickerId required' }, { status: 400 });
+  if (stickerId && !(await ownsSticker(playerId, stickerId))) return NextResponse.json({ error: 'not_owned' }, { status: 403 });
   const store = await readStore();
   const list = store.rooms[roomId] ?? [];
-  const msg: Message = { id: Math.random().toString(36).slice(2), playerId, text, createdAt: new Date().toISOString() };
+  const msg: Message = { id: Math.random().toString(36).slice(2), playerId, text, stickerId, createdAt: new Date().toISOString() };
   list.push(msg);
   store.rooms[roomId] = list.slice(-100);
   await writeStore(store);
