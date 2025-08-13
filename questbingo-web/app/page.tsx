@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 const PWAInstall = dynamic(() => import('./PWAInstall'), { ssr: false });
+const InviteQR = dynamic(() => import('./InviteQR'), { ssr: false });
+const SharePoster = dynamic(() => import('./SharePoster'), { ssr: false });
 
 type BingoItem = { id: string; label: string; found: boolean };
 
@@ -129,6 +131,8 @@ export default function Home() {
   const [questCounted, setQuestCounted] = useState<boolean>(false);
   const [nickname, setNickname] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('global');
+  const [showInvite, setShowInvite] = useState<boolean>(false);
+  const [showPoster, setShowPoster] = useState<boolean>(false);
   const [matchInfo, setMatchInfo] = useState<string>('');
   const [pet, setPet] = useState<Pet | null>(null);
   const [petLoading, setPetLoading] = useState<boolean>(false);
@@ -304,15 +308,33 @@ export default function Home() {
     }
   };
 
-  const onImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  async function compressImage(file: File, maxSize = 1280, quality = 0.8): Promise<string> {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  const onImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = typeof reader.result === 'string' ? reader.result : '';
-        setSelectedImage(result);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const dataUrl = await compressImage(file, 1280, 0.82);
+        setSelectedImage(dataUrl);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = typeof reader.result === 'string' ? reader.result : '';
+          setSelectedImage(result);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -367,14 +389,9 @@ export default function Home() {
           <input value={nickname} onChange={(e) => setNickname(e.target.value.slice(0,24))} placeholder="nickname" className="px-2 py-1 rounded border bg-transparent" />
           <input value={roomId} onChange={(e) => setRoomId(e.target.value.slice(0,32))} placeholder="room" className="px-2 py-1 rounded border bg-transparent w-28" />
           <button
-            onClick={async () => {
-              try {
-                const url = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomId)}`;
-                await navigator.clipboard.writeText(url);
-              } catch {}
-            }}
+            onClick={() => setShowInvite(true)}
             className="px-2 py-1 rounded border"
-            title="Copy invite link"
+            title="Invite people via QR"
           >Invite</button>
           <button onClick={() => setLang('en')} className={`px-2 py-1 rounded ${lang==='en' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>EN</button>
           <button onClick={() => setLang('zh')} className={`px-2 py-1 rounded ${lang==='zh' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>中文</button>
@@ -410,14 +427,17 @@ export default function Home() {
             </div>
           )}
 
-          <div className="mt-4 flex items-center gap-3 text-sm">
-            <div>
-              {t('progress')}: {foundCount} / 25 · {t('lines')}: {lineCount}
+                      <div className="mt-4 flex items-center gap-3 text-sm">
+              <div>
+                {t('progress')}: {foundCount} / 25 · {t('lines')}: {lineCount}
+              </div>
+              <button onClick={onShare} className="px-3 py-1.5 rounded-md border">
+                {t('share')}
+              </button>
+              <button onClick={() => setShowPoster(true)} className="px-3 py-1.5 rounded-md border">
+                Poster
+              </button>
             </div>
-            <button onClick={onShare} className="px-3 py-1.5 rounded-md border">
-              {t('share')}
-            </button>
-          </div>
         </section>
       ) : activeTab === 'snap' ? (
         <section>
@@ -481,13 +501,30 @@ export default function Home() {
                 </div>
               </div>
             )}
-            {peerImage && (
-              <div className="mt-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={peerImage} alt="Peer" className="max-h-60 rounded-lg border" />
-              </div>
-            )}
-          </div>
+                  {peerImage && (
+        <div className="mt-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={peerImage} alt="Peer" className="max-h-60 rounded-lg border" />
+        </div>
+      )}
+
+      {showInvite && (
+        <InviteQR link={`${typeof window !== 'undefined' ? window.location.origin : ''}${typeof window !== 'undefined' ? window.location.pathname : ''}?room=${encodeURIComponent(roomId)}`} onClose={() => setShowInvite(false)} />
+      )}
+      {showPoster && (
+        <SharePoster
+          data={{
+            title: 'QuestBingo',
+            nickname: nickname || 'guest',
+            foundCount,
+            lineCount,
+            roomId,
+            inviteLink: `${typeof window !== 'undefined' ? window.location.origin : ''}${typeof window !== 'undefined' ? window.location.pathname : ''}?room=${encodeURIComponent(roomId)}`,
+          }}
+          onClose={() => setShowPoster(false)}
+        />
+      )}
+    </div>
         </section>
       ) : activeTab === 'quest' ? (
         <section>
