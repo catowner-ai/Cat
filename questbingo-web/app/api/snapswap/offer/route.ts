@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const playerId = String(body.playerId || '').slice(0, 64);
   const roomId = String(body.roomId || 'global').slice(0, 32);
-  const image = String(body.image || '').slice(0, 2048);
+  const image = String(body.image || '').slice(0, 200000);
   if (!playerId || !image) return NextResponse.json({ error: 'playerId and image required' }, { status: 400 });
 
   const store = await readStore();

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+const PWAInstall = dynamic(() => import('./PWAInstall'), { ssr: false });
 
 type BingoItem = { id: string; label: string; found: boolean };
 
@@ -137,8 +139,10 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const roomFromQuery = params.get('room');
       const n = window.localStorage.getItem('questbingo.nickname') || '';
-      const r = window.localStorage.getItem('questbingo.room') || 'global';
+      const r = roomFromQuery || window.localStorage.getItem('questbingo.room') || 'global';
       setNickname(n);
       setRoomId(r);
     }
@@ -311,8 +315,12 @@ export default function Home() {
   const onImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setSelectedImage(url);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        setSelectedImage(result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -360,10 +368,22 @@ export default function Home() {
           >
             {t('pet')}
           </button>
+          {/* PWA install */}
+          <div className="hidden sm:block"><PWAInstall /></div>
         </div>
         <div className="flex items-center gap-1 text-sm">
           <input value={nickname} onChange={(e) => setNickname(e.target.value.slice(0,24))} placeholder="nickname" className="px-2 py-1 rounded border bg-transparent" />
           <input value={roomId} onChange={(e) => setRoomId(e.target.value.slice(0,32))} placeholder="room" className="px-2 py-1 rounded border bg-transparent w-28" />
+          <button
+            onClick={async () => {
+              try {
+                const url = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomId)}`;
+                await navigator.clipboard.writeText(url);
+              } catch {}
+            }}
+            className="px-2 py-1 rounded border"
+            title="Copy invite link"
+          >Invite</button>
           <button onClick={() => setLang('en')} className={`px-2 py-1 rounded ${lang==='en' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>EN</button>
           <button onClick={() => setLang('zh')} className={`px-2 py-1 rounded ${lang==='zh' ? 'bg-black text-white dark:bg-white dark:text-black' : 'border'}`}>中文</button>
         </div>
@@ -417,7 +437,7 @@ export default function Home() {
           </div>
 
           <div className="mt-4">
-            <input type="file" accept="image/*" onChange={onImageSelect} />
+            <input type="file" accept="image/*" capture="environment" onChange={onImageSelect} />
             {selectedImage && (
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
