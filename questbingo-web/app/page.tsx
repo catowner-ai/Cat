@@ -670,12 +670,29 @@ export default function Home() {
                   <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'grant', playerId: nickname, coins: 10 }) }); const r = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d = await r.json(); setCoins(d.wallet?.coins ?? 0); }}>+10 coins</button>
                   <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; // buy glow cosmetic for 50 coins
                     if (coins < 50) { alert('Not enough coins'); return; }
-                    await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'grant', playerId: nickname, coins: -50 }) });
-                    const r1 = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d1 = await r1.json(); setCoins(d1.wallet?.coins ?? 0);
-                    // naive add cosmetic to owned list
-                    setOwned((prev)=> prev.includes('glow') ? prev : [...prev, 'glow']);
+                    await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'buy', playerId: nickname, kind: 'cosmetic', itemId: 'glow' }) });
+                    const r1 = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d1 = await r1.json(); setCoins(d1.wallet?.coins ?? 0); setOwned(d1.wallet?.cosmetics ?? []);
                   }}>Buy Glow (50)</button>
                   <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; setEquipped('glow'); await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'equip', playerId: nickname, cosmetic: 'glow' }) }); }}>Equip Glow</button>
+                </div>
+                <div className="mt-3">
+                  <div className="text-xs opacity-70 mb-1">Shop · Cosmetics</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {['glow','sparkle','shadow','rainbow'].map((c)=> (
+                      <button key={c} className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'buy', playerId: nickname, kind: 'cosmetic', itemId: c }) }); const r = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d = await r.json(); setCoins(d.wallet?.coins ?? 0); setOwned(d.wallet?.cosmetics ?? []); }}>Buy {c}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-xs opacity-70 mb-1">Shop · Stickers</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {['hi','gg','lul','wow'].map((s)=> (
+                      <button key={s} className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'buy', playerId: nickname, kind: 'sticker', itemId: s }) }); const r = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d = await r.json(); setCoins(d.wallet?.coins ?? 0); }}>Buy {s}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-xs opacity-70 mb-1">Owned cosmetics: {owned.join(', ') || 'none'}</div>
                 </div>
               </div>
             </div>
