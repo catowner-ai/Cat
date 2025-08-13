@@ -231,14 +231,22 @@ export default function Home() {
   }, [nickname]);
 
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
         const res = await fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`, { cache: 'no-store' });
         const data = await res.json();
-        setLeaderboard((data.entries || []).slice(0, 5));
+        if (alive) setLeaderboard((data.entries || []).slice(0, 5));
       } catch {}
+      // presence join + heartbeat
+      try { await fetch('/api/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname || 'guest', action: 'join' }) }); } catch {}
+      const iv = setInterval(() => {
+        fetch('/api/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname || 'guest', action: 'heartbeat' }) }).catch(() => {});
+      }, 15000);
+      return () => clearInterval(iv);
     })();
-  }, [roomId]);
+    return () => { alive = false; };
+  }, [roomId, nickname]);
 
   useEffect(() => {
     if (activeTab === 'quest' && !questCounted) {
@@ -282,13 +290,27 @@ export default function Home() {
           body: JSON.stringify({ playerId: nickname || 'guest', roomId, lines }),
         });
       } catch {}
-      // small pet reward for exploration
+      // rewards
       if (nickname) {
         fetch('/api/pet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 1, happiness: 1 }),
         }).then(refreshPet).catch(() => {});
+      }
+      // achievements when hitting lines milestones
+      if (nickname && (lines === 1 || lines === 3 || lines === 5)) {
+        const map: Record<number, { key: string; label: string; icon: string }> = {
+          1: { key: 'first_line', label: 'First Line', icon: '🥇' },
+          3: { key: 'hat_trick', label: 'Hat Trick', icon: '🎩' },
+          5: { key: 'bingo_master', label: 'Bingo Master', icon: '🏆' },
+        };
+        const a = map[lines];
+        if (a) {
+          fetch('/api/achievements', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, ...a })
+          }).catch(() => {});
+        }
       }
     }, 0);
   };
@@ -338,9 +360,12 @@ export default function Home() {
     }
   };
 
-  const spinLucky = () => {
+  const spinLucky = async () => {
     setSpinning(true);
     setTimeout(() => setSpinning(false), 1200);
+    try {
+      await fetch('/api/achievements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname || 'guest', key: 'lucky_spin', label: 'Lucky Spin', icon: '🍀' }) });
+    } catch {}
   };
 
   const PetFace = ({ type }: { type: PetType }) => {
@@ -351,7 +376,7 @@ export default function Home() {
       panda: '🐼',
       dragon: '🐲',
     };
-    return <span style={{ fontSize: 48 }}>{map[type] || '🐾'}</span>;
+    return <span style={{ fontSize: 48 }} aria-label={type} role="img">{map[type] || '🐾'}</span>;
   };
 
   return (

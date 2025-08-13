@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.3",
     "next": "15.4.6",
     "qrcode": "^1.5.4",
     "react": "19.1.0",

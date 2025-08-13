@@ -1,0 +1,1 @@
+Presence store is in-memory for development/demo. For production, move to a shared store (Redis).
