@@ -76,6 +76,8 @@ export default function App() {
   const [guessInput, setGuessInput] = useState<string>('');
   const [boss, setBoss] = useState<{ id: string; title: string } | null>(null);
   const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [messages, setMessages] = useState<{ id: string; playerId: string; text: string; createdAt: string }[]>([]);
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [petType, setPetType] = useState<PetType>('cat');
@@ -104,6 +106,11 @@ export default function App() {
         const r = await fetch(`${API_BASE}/api/boss/progress?playerId=${encodeURIComponent(nickname)}&roomId=${encodeURIComponent(roomId)}`);
         const d = await r.json();
         setBossProgress({ progress: d.progress ?? 0, ready: !!d.ready, already: !!d.already });
+      } catch {}
+      try {
+        const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`);
+        const d = await r.json();
+        setMessages(d.messages || []);
       } catch {}
     })();
   }, []);
@@ -290,6 +297,7 @@ export default function App() {
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                     <TextInput value={guessInput} onChangeText={setGuessInput} placeholder="Guess author" style={[styles.input, { flex: 1 }]} />
                     <TouchableOpacity style={styles.actionBtn} onPress={guessAuthor}><Text>Guess</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ await fetch(`${API_BASE}/api/snapswap/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, roomId, image: peerImage, note: 'inappropriate' }) }); Alert.alert('Reported'); }}><Text>Report</Text></TouchableOpacity>
                   </View>
                 </>
               )}
@@ -322,6 +330,20 @@ export default function App() {
                 <TouchableOpacity style={[styles.actionBtn, { marginTop: 8, opacity: bossProgress?.ready && !bossProgress?.already ? 1 : 0.5 }]} disabled={!bossProgress?.ready || bossProgress?.already} onPress={claimBoss}><Text>{bossProgress?.already ? 'Already' : 'Claim'}</Text></TouchableOpacity>
               </View>
             )}
+            <View style={[styles.card, { marginTop: 10 }]}>
+              <Text style={styles.subtle}>Room chat</Text>
+              <View style={{ maxHeight: 200 }}>
+                <ScrollView>
+                  {messages.map((m)=> (
+                    <Text key={m.id} style={{ marginTop: 2 }}><Text style={{ color: '#666' }}>{m.playerId}: </Text>{m.text}</Text>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <TextInput value={chatInput} onChangeText={setChatInput} placeholder="Say something…" style={[styles.input, { flex: 1 }]} />
+                <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ if (!chatInput.trim()) return; await fetch(`${API_BASE}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname, text: chatInput.trim() }) }); setChatInput(''); const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`); setMessages((await r.json()).messages || []); }}><Text>Send</Text></TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
 

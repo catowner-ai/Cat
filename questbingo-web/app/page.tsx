@@ -136,6 +136,8 @@ export default function Home() {
   const [boss, setBoss] = useState<{ id: string; title: string; type: string; threshold: number } | null>(null);
   const [guessInput, setGuessInput] = useState<string>('');
   const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [messages, setMessages] = useState<{ id: string; playerId: string; text: string; createdAt: string }[]>([]);
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -266,6 +268,8 @@ export default function Home() {
   useEffect(() => {
     // Boss of the day
     fetch('/api/boss').then((r) => r.json()).then((d) => setBoss(d.boss)).catch(() => {});
+    // Load recent chat
+    fetch(`/api/chat?room=${encodeURIComponent(roomId)}`).then((r)=>r.json()).then((d)=> setMessages(d.messages || [])).catch(()=>{});
   }, []);
 
   useEffect(() => {
@@ -279,6 +283,8 @@ export default function Home() {
         if (data.type === 'leaderboard') {
           // refresh leaderboard
           fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`).then((r) => r.json()).then((d) => setLeaderboard((d.entries || []).slice(0,5))).catch(() => {});
+        } else if (data.type === 'chat' && data.message) {
+          setMessages((prev)=> [...prev.slice(-49), data.message]);
         }
       } catch {}
     };
@@ -522,6 +528,10 @@ export default function Home() {
                       setMatchInfo('Wrong guess, try again.');
                     }
                   }}>Guess</button>
+                  <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async ()=>{
+                    await fetch('/api/snapswap/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname || 'guest', roomId, image: peerImage, note: 'inappropriate' }) });
+                    alert('Reported. Thanks!');
+                  }}>Report</button>
                 </div>
               </div>
             )}
@@ -583,6 +593,23 @@ export default function Home() {
             }} disabled={!bossProgress?.ready || bossProgress?.already}>
               {bossProgress?.already ? 'Already claimed' : (bossProgress?.ready ? 'Claim' : 'Not ready')}
             </button>
+          </div>
+          <div className="mt-6 rounded-xl border p-4 bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
+            <div className="text-sm opacity-70 mb-2">Room chat</div>
+            <div className="max-h-48 overflow-auto space-y-1 text-sm mb-2">
+              {messages.map((m)=> (
+                <div key={m.id} className="flex gap-2"><span className="opacity-60">{m.playerId}:</span><span>{m.text}</span></div>
+              ))}
+              {messages.length===0 && <div className="text-xs opacity-60">No messages</div>}
+            </div>
+            <div className="flex items-center gap-2">
+              <input className="px-2 py-1 rounded border bg-transparent text-sm flex-1" placeholder="Say something…" value={chatInput} onChange={(e)=> setChatInput(e.target.value)} />
+              <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async ()=>{
+                if (!chatInput.trim()) return;
+                await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname || 'guest', text: chatInput.trim() }) });
+                setChatInput('');
+              }}>Send</button>
+            </div>
           </div>
         </section>
       ) : (
