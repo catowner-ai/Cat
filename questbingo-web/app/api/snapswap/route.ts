@@ -45,7 +45,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const playerId = String(body.playerId || '').slice(0, 64);
-  const image = String(body.image || '').slice(0, 2048);
+  const image = String(body.image || '').slice(0, 200000);
   if (!playerId || !image) return NextResponse.json({ error: 'playerId and image required' }, { status: 400 });
   const store = await readStore();
   const swap: Swap = { id: Math.random().toString(36).slice(2), playerId, image, createdAt: new Date().toISOString() };
