@@ -189,13 +189,6 @@ export default function Home() {
         setQuest(null);
       }
     };
-    const loadLeaderboard = async () => {
-      try {
-        const res = await fetch(`/api/leaderboard?room=${encodeURIComponent(roomId)}`, { cache: 'no-store' });
-        const data = await res.json();
-        setLeaderboard((data.entries || []).slice(0, 5));
-      } catch {}
-    };
     const loadPeer = async () => {
       try {
         const res = await fetch('/api/snapswap', { cache: 'no-store' });
@@ -207,7 +200,6 @@ export default function Home() {
     loadBoard();
     loadPrompt();
     loadQuest();
-    loadLeaderboard();
     loadPeer();
   }, []);
 
@@ -405,7 +397,8 @@ export default function Home() {
                 <button
                   key={tile.id}
                   onClick={() => onTileToggle(tile.id)}
-                  className={`h-24 p-2 rounded-xl border text-left text-xs transition ${
+                  aria-pressed={tile.found}
+                  className={`h-24 p-2 rounded-xl border text-left text-xs transition-colors duration-150 hover:scale-[0.99] active:scale-95 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
                     tile.found ? 'bg-emerald-500/10 border-emerald-400/50' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10'
                   } ${spinning ? 'rotate-1' : ''}`}
                   title={tile.label}

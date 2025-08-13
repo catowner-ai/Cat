@@ -1,5 +1,5 @@
 const CACHE_NAME = 'questbingo-cache-v1';
-const PRECACHE_URLS = ['/', '/manifest.webmanifest'];
+const PRECACHE_URLS = ['/', '/manifest.webmanifest', '/offline'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -16,6 +16,16 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const offline = await cache.match('/offline');
+        return offline || new Response('Offline', { status: 200, headers: { 'Content-Type': 'text/plain' } });
+      })
+    );
+    return;
+  }
   event.respondWith(
     fetch(request)
       .then((response) => {
