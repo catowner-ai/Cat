@@ -138,6 +138,9 @@ export default function Home() {
   const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
   const [chatInput, setChatInput] = useState<string>('');
   const [messages, setMessages] = useState<{ id: string; playerId: string; text: string; createdAt: string }[]>([]);
+  const [coins, setCoins] = useState<number>(0);
+  const [equipped, setEquipped] = useState<string>('');
+  const [owned, setOwned] = useState<string[]>([]);
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -270,6 +273,8 @@ export default function Home() {
     fetch('/api/boss').then((r) => r.json()).then((d) => setBoss(d.boss)).catch(() => {});
     // Load recent chat
     fetch(`/api/chat?room=${encodeURIComponent(roomId)}`).then((r)=>r.json()).then((d)=> setMessages(d.messages || [])).catch(()=>{});
+    // Load wallet
+    if (nickname) fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`).then((r)=>r.json()).then((d)=>{ setCoins(d.wallet?.coins ?? 0); setEquipped(d.wallet?.equipped ?? ''); setOwned(d.wallet?.cosmetics ?? []); }).catch(()=>{});
   }, []);
 
   useEffect(() => {
@@ -371,7 +376,8 @@ export default function Home() {
       panda: '🐼',
       dragon: '🐲',
     };
-    return <span style={{ fontSize: 48 }}>{map[type] || '🐾'}</span>;
+    const style: React.CSSProperties | undefined = equipped === 'glow' ? ({ textShadow: '0 0 10px rgba(16,185,129,0.8)' } as React.CSSProperties) : undefined;
+    return <span style={{ fontSize: 48, ...style }}>{map[type] || '🐾'}</span>;
   };
 
   return (
@@ -657,6 +663,20 @@ export default function Home() {
                   <option value="dragon">dragon</option>
                 </select>
                 <button className="px-3 py-1.5 rounded-md border" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'selecttype', type: petType }) }); await refreshPet(); }}>{t('save')}</button>
+              </div>
+              <div className="mt-4 rounded-md border p-3">
+                <div className="text-sm mb-2">Wallet · Coins: {coins}</div>
+                <div className="flex gap-2">
+                  <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'grant', playerId: nickname, coins: 10 }) }); const r = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d = await r.json(); setCoins(d.wallet?.coins ?? 0); }}>+10 coins</button>
+                  <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; // buy glow cosmetic for 50 coins
+                    if (coins < 50) { alert('Not enough coins'); return; }
+                    await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'grant', playerId: nickname, coins: -50 }) });
+                    const r1 = await fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`); const d1 = await r1.json(); setCoins(d1.wallet?.coins ?? 0);
+                    // naive add cosmetic to owned list
+                    setOwned((prev)=> prev.includes('glow') ? prev : [...prev, 'glow']);
+                  }}>Buy Glow (50)</button>
+                  <button className="px-2 py-1 rounded border text-xs" onClick={async ()=>{ if(!nickname) return; setEquipped('glow'); await fetch('/api/wallet', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action: 'equip', playerId: nickname, cosmetic: 'glow' }) }); }}>Equip Glow</button>
+                </div>
               </div>
             </div>
           )}
