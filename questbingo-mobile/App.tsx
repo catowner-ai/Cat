@@ -75,6 +75,7 @@ export default function App() {
   const [peerImage, setPeerImage] = useState<string | null>(null);
   const [guessInput, setGuessInput] = useState<string>('');
   const [boss, setBoss] = useState<{ id: string; title: string } | null>(null);
+  const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [petType, setPetType] = useState<PetType>('cat');
@@ -98,6 +99,11 @@ export default function App() {
         const r = await fetch(`${API_BASE}/api/boss`);
         const d = await r.json();
         setBoss(d.boss);
+      } catch {}
+      try {
+        const r = await fetch(`${API_BASE}/api/boss/progress?playerId=${encodeURIComponent(nickname)}&roomId=${encodeURIComponent(roomId)}`);
+        const d = await r.json();
+        setBossProgress({ progress: d.progress ?? 0, ready: !!d.ready, already: !!d.already });
       } catch {}
     })();
   }, []);
@@ -207,6 +213,9 @@ export default function App() {
         Alert.alert('Claimed', 'Rewards granted!');
         const r2 = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`);
         setPet((await r2.json()).pet);
+        const r3 = await fetch(`${API_BASE}/api/boss/progress?playerId=${encodeURIComponent(nickname)}&roomId=${encodeURIComponent(roomId)}`);
+        const d3 = await r3.json();
+        setBossProgress({ progress: d3.progress ?? 0, ready: !!d3.ready, already: !!d3.already });
       } else {
         Alert.alert('Not ready', d.reason || 'unknown');
       }
@@ -305,7 +314,12 @@ export default function App() {
             {boss && (
               <View style={[styles.card, { marginTop: 10 }] }>
                 <Text style={styles.subtle}>Boss: {boss.title}</Text>
-                <TouchableOpacity style={[styles.actionBtn, { marginTop: 8 }]} onPress={claimBoss}><Text>Claim</Text></TouchableOpacity>
+                {bossProgress && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={styles.subtle}>Progress {bossProgress.progress}</Text>
+                  </View>
+                )}
+                <TouchableOpacity style={[styles.actionBtn, { marginTop: 8, opacity: bossProgress?.ready && !bossProgress?.already ? 1 : 0.5 }]} disabled={!bossProgress?.ready || bossProgress?.already} onPress={claimBoss}><Text>{bossProgress?.already ? 'Already' : 'Claim'}</Text></TouchableOpacity>
               </View>
             )}
           </View>
@@ -339,6 +353,7 @@ export default function App() {
                   <TouchableOpacity style={styles.actionBtn} onPress={async () => { await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'feed' }) }); const r = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`); setPet((await r.json()).pet); }}><Text>Feed</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={async () => { await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'play' }) }); const r = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`); setPet((await r.json()).pet); }}><Text>Play</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={async () => { await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'checkin' }) }); const r = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`); setPet((await r.json()).pet); }}><Text>Check‑in</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtn} onPress={async () => { await fetch(`${API_BASE}/api/pet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'treat' }) }); const r = await fetch(`${API_BASE}/api/pet?playerId=${encodeURIComponent(nickname)}`); setPet((await r.json()).pet); }}><Text>Treat</Text></TouchableOpacity>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
                   <Text style={styles.subtle}>Rename</Text>

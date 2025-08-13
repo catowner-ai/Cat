@@ -135,6 +135,7 @@ export default function Home() {
   const [eventsLog, setEventsLog] = useState<string[]>([]);
   const [boss, setBoss] = useState<{ id: string; title: string; type: string; threshold: number } | null>(null);
   const [guessInput, setGuessInput] = useState<string>('');
+  const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -284,6 +285,15 @@ export default function Home() {
     es.onerror = () => {};
     return () => es.close();
   }, [roomId, nickname]);
+
+  useEffect(() => {
+    // refresh boss progress on nickname/room changes
+    if (!nickname) return;
+    fetch(`/api/boss/progress?playerId=${encodeURIComponent(nickname)}&roomId=${encodeURIComponent(roomId)}`)
+      .then((r) => r.json())
+      .then((d) => setBossProgress({ progress: d.progress ?? 0, ready: !!d.ready, already: !!d.already }))
+      .catch(() => {});
+  }, [nickname, roomId]);
 
   const foundCount = useMemo(() => board.filter((b) => b.found).length, [board]);
   const lineCount = useMemo(() => countCompletedLines(board), [board]);
@@ -551,6 +561,14 @@ export default function Home() {
           <div className="mt-6 rounded-xl border p-4 bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10">
             <div className="text-sm opacity-70 mb-1">Boss of the day</div>
             <div className="text-sm">{boss ? boss.title : 'Loading…'}</div>
+            {boss && (
+              <div className="mt-2">
+                <div className="text-xs opacity-70 mb-1">Progress {bossProgress?.progress ?? 0} / {boss.threshold}</div>
+                <div className="w-full h-2 rounded bg-black/10 dark:bg-white/10">
+                  <div className="h-2 rounded bg-indigo-500" style={{ width: `${Math.min(100, Math.round(((bossProgress?.progress ?? 0)/Math.max(1,boss.threshold))*100))}%` }} />
+                </div>
+              </div>
+            )}
             <button className="mt-2 px-3 py-1.5 rounded-md border text-sm" onClick={async () => {
               if (!boss) return;
               const r = await fetch('/api/boss/claim', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname || 'guest', roomId, bossId: boss.id }) });
@@ -558,10 +576,13 @@ export default function Home() {
               if (d.ok) {
                 alert('Claimed rewards!');
                 await refreshPet();
+                fetch(`/api/boss/progress?playerId=${encodeURIComponent(nickname)}&roomId=${encodeURIComponent(roomId)}`).then((r)=>r.json()).then((dd)=> setBossProgress({progress: dd.progress??0, ready: !!dd.ready, already: !!dd.already})).catch(()=>{});
               } else {
                 alert('Not ready: ' + (d.reason || 'unknown'));
               }
-            }}>Claim</button>
+            }} disabled={!bossProgress?.ready || bossProgress?.already}>
+              {bossProgress?.already ? 'Already claimed' : (bossProgress?.ready ? 'Claim' : 'Not ready')}
+            </button>
           </div>
         </section>
       ) : (
@@ -592,6 +613,7 @@ export default function Home() {
                 <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'feed' }) }); await refreshPet(); }}>{t('feed')}</button>
                 <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'play' }) }); await refreshPet(); }}>{t('play')}</button>
                 <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'checkin' }) }); await refreshPet(); }}>{t('checkin')}</button>
+                <button className="px-3 py-1.5 rounded-md border text-sm" onClick={async () => { if (!nickname) return; await fetch('/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, action: 'treat' }) }); await refreshPet(); }}>Treat</button>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                 <label className="opacity-70">{t('rename')}</label>

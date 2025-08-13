@@ -46,6 +46,10 @@ export async function POST(req: Request) {
   const store = await readStore();
   const room: Room = store.rooms[roomId] ?? { offers: [], matches: {} };
 
+  // prune offers older than 12h
+  const now = Date.now();
+  room.offers = room.offers.filter((o) => now - new Date(o.createdAt).getTime() < 12 * 60 * 60 * 1000);
+
   // If already matched, reject to avoid double-play
   if (room.matches[playerId]) {
     return NextResponse.json({ ok: false, reason: 'already_matched' }, { status: 400 });

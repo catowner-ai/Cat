@@ -18,6 +18,8 @@ type Pet = {
   lastFedAt?: string;
   lastPlayedAt?: string;
   cosmetics: string[];
+  treatCountToday?: number;
+  treatDay?: string; // YYYY-MM-DD
 };
 
 type Store = {
@@ -152,6 +154,18 @@ export async function POST(req: Request) {
     const happiness = Number.isFinite(body.happiness) ? Number(body.happiness) : 0;
     pet.happiness = clamp(pet.happiness + happiness, 0, 100);
     applyXp(pet, xp);
+  } else if (action === 'treat') {
+    // up to 10 treats per day, small boost
+    if (pet.treatDay !== today) {
+      pet.treatDay = today;
+      pet.treatCountToday = 0;
+    }
+    const count = pet.treatCountToday ?? 0;
+    if (count < 10) {
+      pet.treatCountToday = count + 1;
+      pet.happiness = clamp(pet.happiness + 1, 0, 100);
+      applyXp(pet, 1);
+    }
   }
 
   await writeStore(store);
