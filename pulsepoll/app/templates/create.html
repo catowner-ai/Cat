@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+	<h1 class="text-2xl font-bold mb-4">{{ t('create_poll') }}</h1>
+	<form action="/create" method="post" class="space-y-4" id="create-form">
+		<div>
+			<label class="block text-sm font-semibold mb-1">{{ t('question') }}</label>
+			<input type="text" name="question" required placeholder="{{ t('enter_question') }}" class="w-full border rounded px-3 py-2"/>
+		</div>
+		<div>
+			<label class="block text-sm font-semibold mb-1">{{ t('options') }}</label>
+			<div class="space-y-2" id="options-container">
+				<input type="text" name="option1" placeholder="{{ t('option_placeholder') }}" class="w-full border rounded px-3 py-2" required/>
+				<input type="text" name="option2" placeholder="{{ t('option_placeholder') }}" class="w-full border rounded px-3 py-2" required/>
+				<input type="text" name="option3" placeholder="{{ t('option_placeholder') }}" class="w-full border rounded px-3 py-2"/>
+				<input type="text" name="option4" placeholder="{{ t('option_placeholder') }}" class="w-full border rounded px-3 py-2"/>
+				<input type="text" name="option5" placeholder="{{ t('option_placeholder') }}" class="w-full border rounded px-3 py-2"/>
+			</div>
+			<button type="button" id="add-option" class="mt-2 text-indigo-600 font-semibold">+ {{ t('add_option') }}</button>
+		</div>
+		<div>
+			<button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded font-semibold">{{ t('create') }}</button>
+		</div>
+	</form>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+	<div class="text-center py-10">
+		<h1 class="text-4xl font-extrabold tracking-tight mb-3">{{ t('app_name') }}</h1>
+		<p class="text-lg text-gray-600 mb-6">{{ t('create_subtitle') }}</p>
+		<a href="/create" class="inline-block bg-indigo-600 text-white px-6 py-3 rounded font-semibold">{{ t('index_cta') }}</a>
+	</div>
+	<div class="mt-10">
+		<h2 class="text-xl font-bold mb-3">{{ t('trending') }}</h2>
+		<div class="grid md:grid-cols-2 gap-4">
+			{% for poll in trending %}
+				<a href="/p/{{ poll.code }}" class="block p-4 bg-white rounded shadow hover:shadow-md">
+					<div class="font-semibold">{{ poll.question }}</div>
+					<div class="text-sm text-gray-500">/{{ poll.code }}/</div>
+				</a>
+			{% else %}
+				<div class="text-gray-500">No polls yet. Be the first!</div>
+			{% endfor %}
+		</div>
+	</div>
+{% endblock %}

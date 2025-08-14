@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{{ poll.question }} - PulsePoll</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<style> body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; } </style>
+	</head>
+	<body class="bg-white">
+		<div class="p-4">
+			<div class="text-sm text-gray-500 mb-2">/{{ poll.code }}/</div>
+			<h1 class="text-lg font-bold mb-4">{{ poll.question }}</h1>
+			<div id="results" class="space-y-2"></div>
+		</div>
+		<script>
+		function renderResults(data) {
+			const total = data.total || 0;
+			const container = document.getElementById('results');
+			container.innerHTML = '';
+			for (const opt of data.options) {
+				const percent = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+				const row = document.createElement('div');
+				row.innerHTML = `
+					<div class="text-sm font-medium mb-1">${opt.text} - ${opt.count} (${percent}%)</div>
+					<div class="w-full bg-gray-200 rounded h-2">
+						<div class="bg-indigo-600 h-2 rounded" style="width: ${percent}%;"></div>
+					</div>
+				`;
+				container.appendChild(row);
+			}
+		}
+		async function fetchResultsOnce() {
+			const res = await fetch('/p/{{ poll.code }}/results', { headers: { 'cache-control': 'no-cache' } });
+			if (res.status === 200) { renderResults(await res.json()); }
+		}
+		if (!!window.EventSource) {
+			const es = new EventSource('/p/{{ poll.code }}/events');
+			es.onmessage = (e) => { try { const data = eval('(' + e.data + ')'); renderResults(data); } catch {} };
+			es.onerror = () => { es.close(); setInterval(fetchResultsOnce, 2000); };
+		} else { setInterval(fetchResultsOnce, 2000); }
+		fetchResultsOnce();
+		</script>
+	</body>
+</html>
