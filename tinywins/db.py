@@ -77,6 +77,16 @@ def init_db() -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gacha_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            pity_rare INTEGER NOT NULL DEFAULT 0,
+            pity_epic INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -270,4 +280,34 @@ def set_artifact_equipped(artifact_id: int, equipped: bool) -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("UPDATE artifacts SET equipped = ? WHERE id = ?", (1 if equipped else 0, int(artifact_id)))
+    conn.commit()
+
+
+def ensure_gacha_state() -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT id FROM gacha_state WHERE id = 1").fetchone()
+    if not row:
+        cur.execute(
+            "INSERT INTO gacha_state(id, pity_rare, pity_epic, updated_at) VALUES (1, 0, 0, ?)",
+            (utils.now_str(),),
+        )
+        conn.commit()
+
+
+def get_gacha_state() -> Dict:
+    ensure_gacha_state()
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT pity_rare, pity_epic, updated_at FROM gacha_state WHERE id = 1").fetchone()
+    return {"pity_rare": int(row["pity_rare"]), "pity_epic": int(row["pity_epic"]), "updated_at": row["updated_at"]}
+
+
+def set_gacha_state(pity_rare: int, pity_epic: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE gacha_state SET pity_rare = ?, pity_epic = ?, updated_at = ? WHERE id = 1",
+        (int(pity_rare), int(pity_epic), utils.now_str()),
+    )
     conn.commit()

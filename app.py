@@ -67,9 +67,33 @@ def main() -> None:
 
     st.sidebar.caption(f"{i18n.t(locale, 'seed_label')}: {board['seed']}  •  {i18n.t(locale, 'rerolls_label')}: {board['rerolls']}")
 
+    # Daily login & commissions
+    with st.sidebar.expander("Daily", expanded=False):
+        if st.button("Claim daily login (20 gems, 30 XP)"):
+            if gamify.claim_daily_login(day_str):
+                st.success("Daily reward claimed")
+            else:
+                st.info("Already claimed today")
+        st.caption("Daily Commissions")
+        for item in gamify.generate_commissions(day_str):
+            if st.button(f"Claim: {item['title']}", key=f"claim-{item['key']}"):
+                if gamify.claim_commission(day_str, item['key']):
+                    st.success("Commission reward claimed")
+                else:
+                    st.info("Already claimed")
+
     # Title
     st.title(i18n.t(locale, "app_title"))
     st.caption(i18n.t(locale, "tagline"))
+
+    # Profile choose (job/element)
+    with st.expander("Profile", expanded=False):
+        prof = db.get_profile()
+        job = st.selectbox("Job Class", options=["None", "Warrior", "Archer", "Mage", "Thief"], index=0)
+        elem = st.selectbox("Element", options=["None", "Pyro", "Hydro", "Electro", "Cryo"], index=0)
+        if st.button("Save Profile"):
+            gamify.set_profile(None if job == "None" else job, None if elem == "None" else elem)
+            st.success("Saved")
 
     # Load tasks and completions
     task_ids: List[str] = board["tasks"]  # type: ignore
@@ -111,6 +135,8 @@ def main() -> None:
 
     # Wish / Gacha
     with st.expander("Wishing (Gacha)", expanded=False):
+        state = db.get_gacha_state()
+        st.caption(f"Pity — Rare: {state['pity_rare']}/10, Epic: {state['pity_epic']}/50")
         colw1, colw2 = st.columns([1, 2])
         count = colw1.selectbox("Count", options=[1, 10], index=0)
         cost = 8 * count
@@ -120,10 +146,15 @@ def main() -> None:
                 st.success(f"Obtained {len(results)} artifact(s)")
             else:
                 st.error("Not enough gems")
-        st.caption("Artifacts")
+        st.caption("Artifacts (click to equip/unequip)")
         arts = db.list_artifacts()
-        for a in arts[:20]:
-            st.write(f"[{a['rarity']}] {a['name']} • {a['perk_key']}")
+        cols = st.columns(3)
+        for i, a in enumerate(arts[:30]):
+            with cols[i % 3]:
+                equipped = a['equipped'] == 1
+                if st.button(f"{'[E] ' if equipped else ''}[{a['rarity']}] {a['name']}", key=f"art-{a['id']}"):
+                    db.set_artifact_equipped(a['id'], not equipped)
+                    st.experimental_rerun()
 
     # Downloads
     tasks_and_status = [(texts[i], bool(comp_map.get(task_ids[i], False))) for i in range(9)]

@@ -127,8 +127,29 @@ def award_task_once(day: str, task_id: str, base_xp: int = 10, gem_reward: int =
 def wish(rng_seed: Optional[int] = None, count: int = 1) -> List[Dict]:
     rnd = random.Random(rng_seed)
     results: List[Dict] = []
+    state = db.get_gacha_state()
+    pity_rare = state["pity_rare"]
+    pity_epic = state["pity_epic"]
     for _ in range(count):
-        art_template = roll_one_artifact(rnd)
+        # pity: guarantee rare at 10, epic at 50
+        # adjust weights if close to pity
+        local_weights = dict(RARITY_WEIGHTS)
+        if pity_epic >= 49:
+            local_weights = {"common": 0, "rare": 0, "epic": 100}
+        elif pity_rare >= 9:
+            local_weights = {"common": 0, "rare": 100, "epic": 0}
+        else:
+            # small soft pity bumps
+            local_weights["rare"] += min(10, pity_rare)
+            local_weights["epic"] += min(5, pity_epic // 5)
+        # sample with adjusted weights
+        rarities = list(local_weights.keys())
+        weights = [local_weights[r] for r in rarities]
+        chosen_rarity = rnd.choices(rarities, weights=weights, k=1)[0]
+        pool = [a for a in ARTIFACT_POOL if a["rarity"] == chosen_rarity]
+        if not pool:
+            pool = ARTIFACT_POOL
+        art_template = rnd.choice(pool)
         art_id = db.add_artifact(
             name=art_template["name"],
             rarity=art_template["rarity"],
@@ -136,6 +157,17 @@ def wish(rng_seed: Optional[int] = None, count: int = 1) -> List[Dict]:
             data_json=utils.json_dumps(art_template.get("data", {})),
         )
         results.append(db.get_artifact_by_id(art_id))
+        # update pity
+        if chosen_rarity == "epic":
+            pity_epic = 0
+            pity_rare = 0
+        elif chosen_rarity == "rare":
+            pity_rare = 0
+            pity_epic += 1
+        else:
+            pity_rare += 1
+            pity_epic += 1
+    db.set_gacha_state(pity_rare=pity_rare, pity_epic=pity_epic)
     return results
 
 
@@ -152,3 +184,46 @@ def list_themes_unlocked() -> List[str]:
             if theme and theme not in themes:
                 themes.append(theme)
     return themes
+
+
+# ---------- Daily Login & Commissions ----------
+
+DAILY_LOGIN_KEY = "daily-login"
+COMMISSION_KEYS = ["commission-1", "commission-2", "commission-3"]
+
+
+def claim_daily_login(day: str) -> bool:
+    if db.add_milestone_if_absent(day, DAILY_LOGIN_KEY):
+        add_gems(20)
+        add_xp(30)
+        return True
+    return False
+
+
+def generate_commissions(day: str) -> List[Dict]:
+    rnd = random.Random(hash(day) & 0xFFFFFFFF)
+    pool = ARTIFACT_POOL
+    # Use tasks catalog as pseudo commissions titles by id
+    titles = [
+        "Complete 5 tasks",
+        "Share your board",
+        "Finish 1 commission",
+        "Clear inbox 5",
+        "Walk 10 minutes",
+        "Journal 5 lines",
+    ]
+    rnd.shuffle(titles)
+    commissions = titles[:3]
+    items: List[Dict] = []
+    for i, title in enumerate(commissions):
+        key = COMMISSION_KEYS[i]
+        items.append({"key": key, "title": title})
+    return items
+
+
+def claim_commission(day: str, key: str) -> bool:
+    if db.add_milestone_if_absent(day, key):
+        add_gems(12)
+        add_xp(20)
+        return True
+    return False
