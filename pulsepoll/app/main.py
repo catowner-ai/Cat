@@ -23,6 +23,7 @@ from .db import init_db, get_session
 from .models import Poll, Option, Vote
 from .utils import generate_short_code, get_or_set_voter_id, detect_language, SimpleRateLimiter, get_client_ip, compute_etag
 from .i18n import t
+from .schemas import CreatePollRequest, VoteRequest
 
 
 BASE_DIR = Path(__file__).parent
@@ -338,11 +339,9 @@ def create_app() -> FastAPI:
 		return RedirectResponse(url=f"/p/{poll.code}")
 
 	@app.post("/api/polls")
-	def api_create_poll(payload: dict, request: Request, session=Depends(get_session)):
-		question = str(payload.get("question", "")).strip()
-		options: List[str] = [str(o).strip() for o in payload.get("options", []) if str(o).strip()]
-		if not question or len(options) < 2:
-			raise HTTPException(status_code=400, detail="invalid_input")
+	def api_create_poll(payload: CreatePollRequest, request: Request, session=Depends(get_session)):
+		question = payload.question
+		options: List[str] = payload.options
 		client_ip = get_client_ip(request)
 		if not rate_limiter.allow(f"create:{client_ip}", limit=100, window_seconds=60 * 60):
 			raise HTTPException(status_code=429, detail="rate_limited")
@@ -367,12 +366,11 @@ def create_app() -> FastAPI:
 		return {"code": poll.code, "question": poll.question, "options": [{"id": o.id, "text": o.text} for o in options]}
 
 	@app.post("/api/polls/{code}/vote")
-	def api_vote(code: str, payload: dict, request: Request, response: Response, session=Depends(get_session)):
-		option_id = int(payload.get("option_id"))
+	def api_vote(code: str, payload: VoteRequest, request: Request, response: Response, session=Depends(get_session)):
+		option_id = int(payload.option_id)
 		poll = session.exec(select(Poll).where(Poll.code == code)).first()
 		if not poll:
 			raise HTTPException(status_code=404, detail="not_found")
-		# rate-limit voting per IP per poll
 		ip = get_client_ip(request)
 		if not rate_limiter.allow(f"vote:{poll.id}:{ip}", limit=120, window_seconds=60):
 			raise HTTPException(status_code=429, detail="rate_limited")
