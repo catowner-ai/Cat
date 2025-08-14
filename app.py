@@ -6,7 +6,7 @@ from typing import List
 
 import streamlit as st
 
-from tinywins import db, tasks, i18n, utils, share_card, ics_utils
+from tinywins import db, tasks, i18n, utils, share_card, ics_utils, gamify
 
 
 st.set_page_config(page_title="TinyWins", page_icon="✨", layout="centered")
@@ -29,6 +29,7 @@ def _ensure_board_for_day(day_str: str, locale: str):
 def _init_once():
     db.init_db()
     utils.ensure_data_dir()
+    gamify.ensure_profile()
 
 
 def main() -> None:
@@ -88,14 +89,19 @@ def main() -> None:
             if new_val != current:
                 db.set_completion(day_str, task_id, new_val)
                 comp_map[task_id] = new_val
+                if new_val:
+                    gamify.award_task_once(day_str, task_id, base_xp=12, gem_reward=3)
             if comp_map.get(task_id):
                 completed_count += 1
 
-    # Stats
-    col_a, col_b = st.columns(2)
+    # Stats + Profile
+    col_a, col_b, col_c = st.columns(3)
     streak = db.get_current_streak()
+    profile = db.get_profile()
+    level, xp_in_level, cap = gamify.level_from_total_xp(profile["xp"] if profile else 0)
     col_a.metric(i18n.t(locale, "streak_label"), f"{streak}")
-    col_b.metric(i18n.t(locale, "tasks_completed"), f"{completed_count}/9")
+    col_b.metric("LV / XP", f"Lv.{level}  {xp_in_level}/{cap}")
+    col_c.metric("Gems", f"{profile['gems'] if profile else 0}")
 
     stats = db.get_stats_last_n_days(14)
     days = [d for d, _ in stats]
@@ -103,8 +109,26 @@ def main() -> None:
     st.area_chart(values, height=140)
     st.caption(i18n.t(locale, "last_14_days"))
 
+    # Wish / Gacha
+    with st.expander("Wishing (Gacha)", expanded=False):
+        colw1, colw2 = st.columns([1, 2])
+        count = colw1.selectbox("Count", options=[1, 10], index=0)
+        cost = 8 * count
+        if colw2.button(f"Wish x{count} (cost {cost} gems)"):
+            if gamify.spend_gems(cost):
+                results = gamify.wish(count=count)
+                st.success(f"Obtained {len(results)} artifact(s)")
+            else:
+                st.error("Not enough gems")
+        st.caption("Artifacts")
+        arts = db.list_artifacts()
+        for a in arts[:20]:
+            st.write(f"[{a['rarity']}] {a['name']} • {a['perk_key']}")
+
     # Downloads
     tasks_and_status = [(texts[i], bool(comp_map.get(task_ids[i], False))) for i in range(9)]
+    themes = gamify.list_themes_unlocked()
+    theme = st.selectbox("Theme", options=themes, index=0)
     share_png = share_card.render_share_card(
         board_date=day_str,
         tasks_and_status=tasks_and_status,
@@ -113,6 +137,7 @@ def main() -> None:
         seed=int(board["seed"]),
         rerolls=int(board["rerolls"]),
         title_text=i18n.t(locale, "app_title"),
+        theme=theme,
     )
     st.download_button(
         label=i18n.t(locale, "download_share_card"),

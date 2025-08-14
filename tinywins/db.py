@@ -41,6 +41,42 @@ def init_db() -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS profile (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            name TEXT NOT NULL,
+            job_class TEXT,
+            element TEXT,
+            xp INTEGER NOT NULL DEFAULT 0,
+            gems INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS milestones (
+            day TEXT NOT NULL,
+            key TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (day, key)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS artifacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            rarity TEXT NOT NULL,
+            perk_key TEXT NOT NULL,
+            data_json TEXT,
+            equipped INTEGER NOT NULL DEFAULT 0,
+            acquired_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -156,3 +192,82 @@ def get_current_streak() -> int:
             continue
         break
     return streak
+
+
+def get_profile():
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT id, name, job_class, element, xp, gems, updated_at FROM profile WHERE id = 1").fetchone()
+    return dict(row) if row else None
+
+
+def upsert_profile(name: str, job_class: str | None, element: str | None, xp: int, gems: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO profile(id, name, job_class, element, xp, gems, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?)\n         ON CONFLICT(id) DO UPDATE SET name = excluded.name, job_class = excluded.job_class, element = excluded.element, xp = excluded.xp, gems = excluded.gems, updated_at = excluded.updated_at",
+        (name, job_class, element, int(xp), int(gems), utils.now_str()),
+    )
+    conn.commit()
+
+
+def add_profile_xp(delta: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE profile SET xp = COALESCE(xp, 0) + ?, updated_at = ? WHERE id = 1", (int(delta), utils.now_str()))
+    conn.commit()
+
+
+def add_profile_gems(delta: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE profile SET gems = COALESCE(gems, 0) + ?, updated_at = ? WHERE id = 1", (int(delta), utils.now_str()))
+    conn.commit()
+
+
+def add_milestone_if_absent(day: str, key: str) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO milestones(day, key, created_at) VALUES (?, ?, ?)", (day, key, utils.now_str()))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+
+
+# Artifacts
+
+def add_artifact(name: str, rarity: str, perk_key: str, data_json: str | None = None) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO artifacts(name, rarity, perk_key, data_json, equipped, acquired_at) VALUES (?, ?, ?, ?, 0, ?)",
+        (name, rarity, perk_key, data_json, utils.now_str()),
+    )
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def get_artifact_by_id(artifact_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT id, name, rarity, perk_key, data_json, equipped, acquired_at FROM artifacts WHERE id = ?", (int(artifact_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def list_artifacts(equipped_only: bool = False) -> list[dict]:
+    conn = get_connection()
+    cur = conn.cursor()
+    if equipped_only:
+        rows = cur.execute("SELECT id, name, rarity, perk_key, data_json, equipped, acquired_at FROM artifacts WHERE equipped = 1 ORDER BY acquired_at DESC").fetchall()
+    else:
+        rows = cur.execute("SELECT id, name, rarity, perk_key, data_json, equipped, acquired_at FROM artifacts ORDER BY acquired_at DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_artifact_equipped(artifact_id: int, equipped: bool) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE artifacts SET equipped = ? WHERE id = ?", (1 if equipped else 0, int(artifact_id)))
+    conn.commit()

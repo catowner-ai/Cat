@@ -49,6 +49,7 @@ def render_share_card(
     seed: int,
     rerolls: int,
     title_text: str,
+    theme: str | None = None,
 ) -> BytesIO:
     W, H = 1080, 1350
     margin = 40
@@ -58,11 +59,37 @@ def render_share_card(
     cell_w = grid_w // 3
     cell_h = grid_h // 3
 
-    bg = (14, 17, 23)
-    panel = (27, 31, 42)
-    primary = (123, 211, 137)
-    text_color = (230, 230, 230)
-    muted = (160, 170, 180)
+    # Theme palettes
+    palettes = {
+        "Default": {
+            "bg": (14, 17, 23),
+            "panel": (27, 31, 42),
+            "primary": (123, 211, 137),
+            "text": (230, 230, 230),
+            "muted": (160, 170, 180),
+        },
+        "Pyro": {
+            "bg": (20, 14, 14),
+            "panel": (46, 24, 20),
+            "primary": (234, 86, 54),
+            "text": (250, 232, 218),
+            "muted": (210, 150, 130),
+        },
+        "Cygnus": {
+            "bg": (10, 12, 30),
+            "panel": (22, 25, 55),
+            "primary": (120, 140, 255),
+            "text": (230, 236, 255),
+            "muted": (170, 180, 220),
+        },
+    }
+    pal = palettes.get(theme or "Default", palettes["Default"])
+
+    bg = pal["bg"]
+    panel = pal["panel"]
+    primary = pal["primary"]
+    text_color = pal["text"]
+    muted = pal["muted"]
 
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)

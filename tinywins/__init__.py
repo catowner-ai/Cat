@@ -5,4 +5,5 @@ __all__ = [
 	"share_card",
 	"ics_utils",
 	"utils",
+	"gamify",
 ]
