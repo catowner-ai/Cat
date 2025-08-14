@@ -87,6 +87,15 @@ def init_db() -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS talents (
+            key TEXT PRIMARY KEY,
+            level INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -309,5 +318,51 @@ def set_gacha_state(pity_rare: int, pity_epic: int) -> None:
     cur.execute(
         "UPDATE gacha_state SET pity_rare = ?, pity_epic = ?, updated_at = ? WHERE id = 1",
         (int(pity_rare), int(pity_epic), utils.now_str()),
+    )
+    conn.commit()
+
+
+def list_completions_with_times(day: str) -> list[dict]:
+    conn = get_connection()
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT task_id, completed_at FROM completions WHERE day = ? AND completed = 1 AND completed_at IS NOT NULL ORDER BY completed_at ASC",
+        (day,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_recent_completed(day: str, limit: int = 2) -> list[dict]:
+    conn = get_connection()
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT task_id, completed_at FROM completions WHERE day = ? AND completed = 1 AND completed_at IS NOT NULL ORDER BY completed_at DESC LIMIT ?",
+        (day, int(limit)),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# Talents
+
+def get_talents() -> dict[str, int]:
+    conn = get_connection()
+    cur = conn.cursor()
+    rows = cur.execute("SELECT key, level FROM talents").fetchall()
+    return {r["key"]: int(r["level"]) for r in rows}
+
+
+def get_talent_level(key: str) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT level FROM talents WHERE key = ?", (key,)).fetchone()
+    return int(row[0]) if row else 0
+
+
+def set_talent_level(key: str, level: int) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO talents(key, level, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET level = excluded.level, updated_at = excluded.updated_at",
+        (key, int(level), utils.now_str()),
     )
     conn.commit()

@@ -115,6 +115,8 @@ def main() -> None:
                 comp_map[task_id] = new_val
                 if new_val:
                     gamify.award_task_once(day_str, task_id, base_xp=12, gem_reward=3)
+                    recent = db.get_recent_completed(day_str, limit=2)
+                    gamify.apply_combo_bonus(day_str, recent)
             if comp_map.get(task_id):
                 completed_count += 1
 
@@ -126,12 +128,37 @@ def main() -> None:
     col_a.metric(i18n.t(locale, "streak_label"), f"{streak}")
     col_b.metric("LV / XP", f"Lv.{level}  {xp_in_level}/{cap}")
     col_c.metric("Gems", f"{profile['gems'] if profile else 0}")
+    with st.expander("Talents", expanded=False):
+        talents = gamify.get_talents()
+        cols_t = st.columns(2)
+        with cols_t[0]:
+            lvl = int(talents.get("combo_mastery", 0))
+            if st.button(f"Combo Mastery Lv.{lvl} (+{2*lvl}% XP)"):
+                if gamify.upgrade_talent("combo_mastery"):
+                    st.success("Upgraded Combo Mastery")
+                else:
+                    st.info("Cannot upgrade")
+        with cols_t[1]:
+            lvl = int(talents.get("elemental_attunement", 0))
+            if st.button(f"Elemental Attunement Lv.{lvl}"):
+                if gamify.upgrade_talent("elemental_attunement"):
+                    st.success("Upgraded Elemental Attunement")
+                else:
+                    st.info("Cannot upgrade")
 
     stats = db.get_stats_last_n_days(14)
     days = [d for d, _ in stats]
     values = [v for _, v in stats]
     st.area_chart(values, height=140)
     st.caption(i18n.t(locale, "last_14_days"))
+
+    # Weekly Boss
+    with st.expander("Weekly Boss", expanded=False):
+        if st.button("Claim weekly reward"):
+            if gamify.claim_weekly_boss_reward(day_str):
+                st.success("Weekly reward claimed")
+            else:
+                st.info("Already claimed this week")
 
     # Wish / Gacha
     with st.expander("Wishing (Gacha)", expanded=False):

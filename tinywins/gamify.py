@@ -227,3 +227,64 @@ def claim_commission(day: str, key: str) -> bool:
         add_xp(20)
         return True
     return False
+
+
+# ---------- Talents & Combos ----------
+
+TALENT_DEFS = {
+    "combo_mastery": {"name": "Combo Mastery", "max": 5, "xp_bonus_per_level": 2},
+    "elemental_attunement": {"name": "Elemental Attunement", "max": 5, "gem_bonus_per_level": 1},
+}
+
+
+def get_talents() -> dict:
+    return db.get_talents()
+
+
+def upgrade_talent(key: str) -> bool:
+    defs = TALENT_DEFS.get(key)
+    if not defs:
+        return False
+    level = db.get_talent_level(key)
+    if level >= int(defs["max"]):
+        return False
+    # simple cost: 20 gems per level
+    if not spend_gems(20):
+        return False
+    db.set_talent_level(key, level + 1)
+    return True
+
+
+def apply_combo_bonus(day: str, recently_completed: list[dict]) -> None:
+    # If two tasks completed within the last two completions, grant small bonus
+    if len(recently_completed) >= 2:
+        tdefs = TALENT_DEFS["combo_mastery"]
+        level = db.get_talent_level("combo_mastery")
+        xp_bonus = level * int(tdefs["xp_bonus_per_level"]) if level > 0 else 0
+        if xp_bonus > 0:
+            add_xp(xp_bonus)
+
+
+# ---------- Weekly Boss ----------
+
+WEEKLY_BOSS_KEY = "weekly-boss"
+
+
+def can_claim_weekly_boss(day: str) -> bool:
+    # allow claiming once per calendar week (Mon-Sun)
+    # We mark key as WEEKLY_BOSS_KEY-YYYY-WW (ISO week)
+    from datetime import datetime
+
+    dt = datetime.strptime(day, "%Y-%m-%d")
+    week_key = f"{WEEKLY_BOSS_KEY}-{dt.isocalendar().year}-{dt.isocalendar().week}"
+    # Use a fixed milestone day bucket so it's truly once per week
+    return db.add_milestone_if_absent("weekly", week_key)
+
+
+def claim_weekly_boss_reward(day: str) -> bool:
+    # Grant a bigger reward
+    if can_claim_weekly_boss(day):
+        add_gems(80)
+        add_xp(120)
+        return True
+    return False
