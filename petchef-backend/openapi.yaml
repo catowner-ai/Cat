@@ -1,0 +1,326 @@
+openapi: 3.1.0
+info:
+  title: PetChef API
+  description: Fridge + Duo Recipes (human & pet) + Pet feeding utilities
+  version: 0.1.0
+servers:
+  - url: http://localhost:8787/v1
+paths:
+  /health:
+    get:
+      summary: Healthcheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+  /inventory:
+    get:
+      summary: List inventory items
+      responses:
+        '200':
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FridgeItem'
+    post:
+      summary: Create or upsert inventory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FridgeItem'
+      responses:
+        '200':
+          description: Created
+  /inventory/{id}:
+    put:
+      summary: Update inventory item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FridgeItem'
+      responses:
+        '200':
+          description: Updated
+    delete:
+      summary: Delete inventory item
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+  /pets:
+    get:
+      summary: List pets
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetProfile'
+      responses:
+        '200':
+          description: Created
+  /pets/{id}/calories:
+    get:
+      summary: Estimate kcal per meal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kcalPerMeal:
+                    type: integer
+  /recipes:
+    get:
+      summary: List recipes
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Create recipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Recipe'
+      responses:
+        '200':
+          description: Created
+  /recipes/suggest:
+    get:
+      summary: Recommend recipes based on inventory and expiry
+      parameters:
+        - in: query
+          name: variant
+          schema:
+            type: string
+            enum: [human, pet]
+          description: Recipe variant to suggest
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  variant:
+                    type: string
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        score:
+                          type: number
+                        missing:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              qty:
+                                type: number
+                              unit:
+                                type: string
+                        recipe:
+                          $ref: '#/components/schemas/Recipe'
+  /duo/suggest:
+    get:
+      summary: Recommend paired human + pet recipes from the same base
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pairs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        baseRecipeId:
+                          type: string
+                        score:
+                          type: number
+                        human:
+                          type: object
+                          properties:
+                            score:
+                              type: number
+                            missing:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                  qty:
+                                    type: number
+                                  unit:
+                                    type: string
+                            recipe:
+                              $ref: '#/components/schemas/Recipe'
+                        pet:
+                          type: object
+                          properties:
+                            score:
+                              type: number
+                            missing:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                  qty:
+                                    type: number
+                                  unit:
+                                    type: string
+                            recipe:
+                              $ref: '#/components/schemas/Recipe'
+components:
+  schemas:
+    FridgeItem:
+      type: object
+      required: [id, householdId, name, quantity, unit, expiresOn, tags]
+      properties:
+        id:
+          type: string
+        householdId:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        expiresOn:
+          type: string
+          description: ISO date string
+        tags:
+          type: array
+          items:
+            type: string
+            enum: [human, pet, shared]
+        barcode:
+          type: string
+          nullable: true
+    PetProfile:
+      type: object
+      required: [id, householdId, name, species, weightKg, activityLevel]
+      properties:
+        id:
+          type: string
+        householdId:
+          type: string
+        name:
+          type: string
+        species:
+          type: string
+          enum: [dog, cat, other]
+        breed:
+          type: string
+        birthdate:
+          type: string
+        weightKg:
+          type: number
+        allergies:
+          type: array
+          items:
+            type: string
+        activityLevel:
+          type: string
+          enum: [low, normal, high]
+    Recipe:
+      type: object
+      required: [id, title, variant, ingredients, steps]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        variant:
+          type: string
+          enum: [human, pet]
+        baseRecipeId:
+          type: string
+          nullable: true
+        ingredients:
+          type: array
+          items:
+            type: object
+            required: [name, qty, unit]
+            properties:
+              name:
+                type: string
+              qty:
+                type: number
+              unit:
+                type: string
+              optional:
+                type: boolean
+        steps:
+          type: array
+          items:
+            type: string
+        dietTags:
+          type: array
+          items:
+            type: string
+        petSafety:
+          type: object
+          properties:
+            safeFor:
+              type: array
+              items:
+                type: string
+                enum: [dog, cat, other]
+            avoid:
+              type: array
+              items:
+                type: string
