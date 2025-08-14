@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+	<div class="flex items-center justify-between mb-6">
+		<h1 class="text-2xl font-bold">{{ poll.question }}</h1>
+		<div class="text-gray-500">/{{ poll.code }}/</div>
+	</div>
+	<form action="/p/{{ poll.code }}/vote" method="post" class="space-y-3" id="vote-form">
+		{% for option in options %}
+			<label class="block">
+				<input type="radio" name="option_id" value="{{ option.id }}" {% if current_vote and current_vote.option_id == option.id %}checked{% endif %} class="mr-2">
+				<span class="text-lg">{{ option.text }}</span>
+			</label>
+		{% endfor %}
+		<button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded font-semibold">{{ t('vote') }}</button>
+	</form>
+	<div class="mt-8">
+		<h2 class="text-xl font-bold mb-2">{{ t('results') }}</h2>
+		<div id="results" class="space-y-2"></div>
+		<div class="text-sm text-gray-500 mt-2">{{ t('share_link') }}: <code class="bg-gray-100 px-2 py-1 rounded">{{ request.url }}</code></div>
+	</div>
+	<script>
+	async function fetchResults() {
+		const res = await fetch('/p/{{ poll.code }}/results');
+		const data = await res.json();
+		const total = data.total || 0;
+		const container = document.getElementById('results');
+		container.innerHTML = '';
+		for (const opt of data.options) {
+			const percent = total > 0 ? Math.round((opt.count / total) * 100) : 0;
+			const row = document.createElement('div');
+			row.innerHTML = `
+				<div class="text-sm font-medium mb-1">${opt.text} - ${opt.count} (${percent}%)</div>
+				<div class="w-full bg-gray-200 rounded h-3">
+					<div class="bg-indigo-600 h-3 rounded" style="width: ${percent}%;"></div>
+				</div>
+			`;
+			container.appendChild(row);
+		}
+	}
+	fetchResults();
+	setInterval(fetchResults, 2000);
+
+	document.getElementById('vote-form').addEventListener('submit', async (e) => {
+		e.preventDefault();
+		const form = e.currentTarget;
+		const formData = new FormData(form);
+		const res = await fetch(form.action, { method: 'POST', body: formData, redirect: 'follow' });
+		if (res.redirected) {
+			// follow redirect and refresh results
+			window.history.replaceState({}, '', res.url);
+			fetchResults();
+			if (window.confetti) {
+				window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
+			}
+		}
+	});
+	</script>
+{% endblock %}

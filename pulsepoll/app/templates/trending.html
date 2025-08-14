@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+	<h1 class="text-2xl font-bold mb-6">{{ t('trending') }}</h1>
+	<div class="grid md:grid-cols-2 gap-4">
+		{% for poll in polls %}
+			<a href="/p/{{ poll.code }}" class="block p-4 bg-white rounded shadow hover:shadow-md">
+				<div class="font-semibold">{{ poll.question }}</div>
+				<div class="text-sm text-gray-500">/{{ poll.code }}/</div>
+			</a>
+		{% else %}
+			<div class="text-gray-500">No trending polls right now.</div>
+		{% endfor %}
+	</div>
+{% endblock %}
