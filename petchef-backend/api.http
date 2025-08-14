@@ -1,0 +1,20 @@
+### Health
+GET http://localhost:8787/v1/health
+
+### Inventory list
+GET http://localhost:8787/v1/inventory
+
+### Suggest human recipes
+GET http://localhost:8787/v1/recipes/suggest?variant=human
+
+### Suggest pet recipes
+GET http://localhost:8787/v1/recipes/suggest?variant=pet
+
+### Duo suggestions
+GET http://localhost:8787/v1/duo/suggest
+
+### List pets
+GET http://localhost:8787/v1/pets
+
+### Pet calories per meal
+GET http://localhost:8787/v1/pets/pet-momo/calories
