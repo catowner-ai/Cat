@@ -130,6 +130,12 @@ export async function POST(req: Request) {
       pet.hunger = clamp(pet.hunger + 5, 0, 100);
       pet.happiness = clamp(pet.happiness + 5, 0, 100);
       applyXp(pet, 10);
+      if (pet.streakDays === 3) {
+        try {
+          await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'achieve', playerId, id: 'streak3', title: '3-Day Streak' }) });
+          await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant', playerId, coins: 20 }) });
+        } catch {}
+      }
     }
   } else if (action === 'feed') {
     pet.hunger = clamp(pet.hunger - 15, 0, 100);

@@ -100,6 +100,7 @@ export async function POST(req: Request) {
     entry = { playerId, lines: 0, quests: 0, updatedAt: new Date().toISOString() };
     todaysRoom.push(entry);
   }
+  const prevLines = entry.lines;
   if (typeof lines === 'number') {
     entry.lines = Math.max(entry.lines, lines);
   }
@@ -109,5 +110,12 @@ export async function POST(req: Request) {
   entry.updatedAt = new Date().toISOString();
   await writeStore(store);
   try { const mod = await import('../_events'); (mod as { publish: (room: string, ev: unknown) => void }).publish(roomId, { type: 'leaderboard', roomId, playerId, lines: entry.lines, quests: entry.quests }); } catch {}
+  // Award first line achievement
+  if (prevLines === 0 && entry.lines > 0) {
+    try {
+      await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'achieve', playerId, id: 'first_line', title: 'First Line!' }) });
+      await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant', playerId, coins: 10 }) });
+    } catch {}
+  }
   return NextResponse.json({ ok: true, day, room: roomId, entry });
 }

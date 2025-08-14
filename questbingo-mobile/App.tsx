@@ -78,6 +78,9 @@ export default function App() {
   const [bossProgress, setBossProgress] = useState<{ progress: number; ready: boolean; already: boolean } | null>(null);
   const [chatInput, setChatInput] = useState<string>('');
   const [messages, setMessages] = useState<{ id: string; playerId: string; text: string; createdAt: string }[]>([]);
+  const [stickers, setStickers] = useState<{ id: string; label: string }[]>([]);
+  const [stickerToSend, setStickerToSend] = useState<string>('');
+  const [coins, setCoins] = useState<number>(0);
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [petType, setPetType] = useState<PetType>('cat');
@@ -111,6 +114,16 @@ export default function App() {
         const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`);
         const d = await r.json();
         setMessages(d.messages || []);
+      } catch {}
+      try {
+        const r = await fetch(`${API_BASE}/api/stickers`);
+        const d = await r.json();
+        setStickers(d.stickers || []);
+      } catch {}
+      try {
+        const r = await fetch(`${API_BASE}/api/wallet?playerId=${encodeURIComponent(nickname)}`);
+        const d = await r.json();
+        setCoins(d.wallet?.coins ?? 0);
       } catch {}
     })();
   }, []);
@@ -342,6 +355,22 @@ export default function App() {
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                 <TextInput value={chatInput} onChangeText={setChatInput} placeholder="Say something…" style={[styles.input, { flex: 1 }]} />
                 <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ if (!chatInput.trim()) return; await fetch(`${API_BASE}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname, text: chatInput.trim() }) }); setChatInput(''); const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`); setMessages((await r.json()).messages || []); }}><Text>Send</Text></TouchableOpacity>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                <Text style={styles.subtle}>Sticker</Text>
+                <ScrollView horizontal>
+                  {stickers.map((s)=> (
+                    <TouchableOpacity key={s.id} style={[styles.chip, stickerToSend===s.id && styles.chipActive]} onPress={()=> setStickerToSend(s.id)}><Text style={[styles.chipText, stickerToSend===s.id && styles.chipTextActive]}>{s.label}</Text></TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ if (!stickerToSend) return; await fetch(`${API_BASE}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, playerId: nickname, stickerId: stickerToSend }) }); setStickerToSend(''); const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`); setMessages((await r.json()).messages || []); }}><Text>Send sticker</Text></TouchableOpacity>
+              </View>
+            </View>
+            <View style={[styles.card, { marginTop: 10 }]}>
+              <Text style={styles.subtle}>Wallet · Coins: {coins}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ await fetch(`${API_BASE}/api/wallet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant', playerId: nickname, coins: 10 }) }); const r = await fetch(`${API_BASE}/api/wallet?playerId=${encodeURIComponent(nickname)}`); setCoins((await r.json()).wallet?.coins ?? 0); }}><Text>+10 coins</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={async ()=>{ await fetch(`${API_BASE}/api/wallet`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'buy', playerId: nickname, kind: 'sticker', itemId: 'hi' }) }); const r = await fetch(`${API_BASE}/api/wallet?playerId=${encodeURIComponent(nickname)}`); setCoins((await r.json()).wallet?.coins ?? 0); }}><Text>Buy :hi:</Text></TouchableOpacity>
               </View>
             </View>
           </View>

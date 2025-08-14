@@ -143,6 +143,7 @@ export default function Home() {
   const [owned, setOwned] = useState<string[]>([]);
   const [stickers, setStickers] = useState<{ id: string; label: string }[]>([]);
   const [stickerToSend, setStickerToSend] = useState<string>('');
+  const [achievements, setAchievements] = useState<{ id: string; title: string; at: string }[]>([]);
 
   const t = (k: string) => STRINGS[lang][k] ?? k;
 
@@ -276,7 +277,7 @@ export default function Home() {
     // Load recent chat
     fetch(`/api/chat?room=${encodeURIComponent(roomId)}`).then((r)=>r.json()).then((d)=> setMessages(d.messages || [])).catch(()=>{});
     // Load wallet
-    if (nickname) fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`).then((r)=>r.json()).then((d)=>{ setCoins(d.wallet?.coins ?? 0); setEquipped(d.wallet?.equipped ?? ''); setOwned(d.wallet?.cosmetics ?? []); }).catch(()=>{});
+    if (nickname) fetch(`/api/wallet?playerId=${encodeURIComponent(nickname)}`).then((r)=>r.json()).then((d)=>{ setCoins(d.wallet?.coins ?? 0); setEquipped(d.wallet?.equipped ?? ''); setOwned(d.wallet?.cosmetics ?? []); setAchievements((d.wallet?.achievements ?? []).slice(-3).reverse()); }).catch(()=>{});
     // Load stickers catalog
     fetch('/api/stickers').then((r)=>r.json()).then((d)=> setStickers(d.stickers || [])).catch(()=>{});
   }, []);
@@ -715,6 +716,15 @@ export default function Home() {
                 </div>
                 <div className="mt-3">
                   <div className="text-xs opacity-70 mb-1">Owned cosmetics: {owned.join(', ') || 'none'}</div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-xs opacity-70 mb-1">Recent achievements</div>
+                  <ul className="text-xs list-disc list-inside space-y-1">
+                    {achievements.map((a)=> (
+                      <li key={a.id}>{a.title}</li>
+                    ))}
+                    {achievements.length===0 && <li className="opacity-60">No achievements yet</li>}
+                  </ul>
                 </div>
               </div>
             </div>

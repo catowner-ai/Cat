@@ -40,6 +40,10 @@ export async function POST(req: Request) {
     store.rooms[roomId] = room;
     await writeStore(store);
     try { const mod = await import('../../_events'); (mod as { publish: (room: string, ev: unknown) => void }).publish(roomId, { type: 'reveal', roomId, playerId, partnerId: partnerOffer.playerId }); } catch {}
+    try {
+      await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'achieve', playerId, id: 'first_guess', title: 'Sharp Eye!' }) });
+      await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant', playerId, coins: 15 }) });
+    } catch {}
     return NextResponse.json({ ok: true, correct: true, partner: { playerId: partnerOffer.playerId } });
   }
   return NextResponse.json({ ok: true, correct: false });

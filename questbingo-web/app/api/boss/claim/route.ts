@@ -71,6 +71,11 @@ export async function POST(req: Request) {
 
   // Grant pet rewards
   await fetch('http://localhost:3000/api/pet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId, action: 'grant', xp: boss.rewardXp, happiness: boss.rewardHappy }) }).catch(() => {});
+  // Achieve and grant coins
+  try {
+    await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'achieve', playerId, id: `boss_${boss.id}`, title: `Boss: ${boss.id}` }) });
+    await fetch('http://localhost:3000/api/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'grant', playerId, coins: 25 }) });
+  } catch {}
 
   return NextResponse.json({ ok: true, rewards: { xp: boss.rewardXp, happiness: boss.rewardHappy } });
 }
