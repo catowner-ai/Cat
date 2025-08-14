@@ -1,0 +1,11 @@
+{
+	"name": "PulsePoll",
+	"short_name": "PulsePoll",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#4f46e5",
+	"icons": [
+		{ "src": "/static/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+	]
+}

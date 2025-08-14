@@ -4,6 +4,15 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>{{ t('app_name') }}</title>
+		<meta name="description" content="Ask anything. Get the world's pulse in seconds." />
+		<meta property="og:title" content="PulsePoll" />
+		<meta property="og:description" content="Create instant polls and see results live." />
+		<meta property="og:type" content="website" />
+		<meta property="og:image" content="/static/logo.svg" />
+		<meta property="og:url" content="{{ request.url }}" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<link rel="manifest" href="/static/manifest.webmanifest" />
+		<link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
 		<script src="https://cdn.tailwindcss.com"></script>
 		<link rel="preconnect" href="https://fonts.googleapis.com"/>
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -16,10 +25,11 @@
 		<header class="border-b bg-white">
 			<div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
 				<a href="/" class="text-2xl font-extrabold text-indigo-600">{{ t('app_name') }}</a>
-				<nav class="space-x-4">
+				<nav class="space-x-4 flex items-center">
 					<a href="/create" class="text-sm font-semibold text-white bg-indigo-600 px-3 py-2 rounded">{{ t('create_poll') }}</a>
 					<a href="/trending" class="text-sm font-semibold text-indigo-600">{{ t('trending') }}</a>
 					<a href="/random" class="text-sm font-semibold text-indigo-600">{{ t('random') }}</a>
+					<a href="/lang/{% if lang == 'zh-TW' %}en{% else %}zh-TW{% endif %}" class="text-sm text-gray-500 hover:text-gray-700">{% if lang == 'zh-TW' %}EN{% else %}繁中{% endif %}</a>
 				</nav>
 			</div>
 		</header>

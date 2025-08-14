@@ -4,7 +4,7 @@ import datetime as dt
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
@@ -46,16 +46,42 @@ def create_app() -> FastAPI:
 	async def health() -> dict:
 		return {"status": "ok", "time": dt.datetime.utcnow().isoformat()}
 
+	@app.get("/robots.txt")
+	def robots() -> PlainTextResponse:
+		return PlainTextResponse("User-agent: *\nAllow: /\n")
+
+	@app.get("/sitemap.xml")
+	def sitemap(request: Request, session=Depends(get_session)) -> PlainTextResponse:
+		root = str(request.base_url).rstrip("/")
+		polls = list(session.exec(select(Poll).order_by(Poll.created_at.desc()).limit(200)))
+		urls = [f"<url><loc>{root}/</loc></url>", f"<url><loc>{root}/trending</loc></url>"] + [f"<url><loc>{root}/p/{p.code}</loc></url>" for p in polls]
+		xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" \
+			+ "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" \
+			+ "".join(urls) + "</urlset>"
+		return PlainTextResponse(xml, media_type="application/xml")
+
+	@app.get("/lang/{lang}")
+	def switch_lang(lang: str, request: Request):
+		resp = RedirectResponse(url=request.headers.get("referer") or "/")
+		if lang not in {"en", "zh-TW"}:
+			lang = "en"
+		resp.set_cookie("lang", lang, max_age=60 * 60 * 24 * 365, samesite="lax")
+		return resp
+
 	@app.get("/", response_class=HTMLResponse)
 	def index(request: Request, session=Depends(get_session)):
 		lang = detect_language(request)
-		# top 5 trending by votes in last 24h
 		cutoff = dt.datetime.utcnow() - dt.timedelta(days=1)
-		trending_stmt = select(Poll).where(Poll.created_at >= cutoff).order_by(Poll.created_at.desc()).limit(10)
-		trending = list(session.exec(trending_stmt))
+		polls_recent = list(session.exec(select(Poll).order_by(Poll.created_at.desc()).limit(100)))
+		# trending by votes in last 24h
+		vote_counts = {}
+		for p in polls_recent:
+			count = session.exec(select(Vote).where(Vote.poll_id == p.id, Vote.created_at >= cutoff)).all()
+			vote_counts[p.code] = len(count)
+		trending = sorted(polls_recent, key=lambda p: (vote_counts.get(p.code, 0), p.created_at), reverse=True)[:10]
 		return templates.TemplateResponse(
 			"index.html",
-			{"request": request, "t": lambda k: t(lang, k), "trending": trending},
+			{"request": request, "t": lambda k: t(lang, k), "trending": trending, "lang": lang},
 		)
 
 	@app.get("/create", response_class=HTMLResponse)
@@ -63,7 +89,7 @@ def create_app() -> FastAPI:
 		lang = detect_language(request)
 		return templates.TemplateResponse(
 			"create.html",
-			{"request": request, "t": lambda k: t(lang, k)},
+			{"request": request, "t": lambda k: t(lang, k), "lang": lang},
 		)
 
 	@app.post("/create")
@@ -81,13 +107,10 @@ def create_app() -> FastAPI:
 		options_text = [o.strip() for o in [option1, option2, option3, option4, option5] if o and o.strip()]
 		if not question.strip() or len(options_text) < 2:
 			raise HTTPException(status_code=400, detail="invalid_input")
-		# simple rate limit by ip
 		client_ip = request.client.host if request.client else "anon"
 		if not rate_limiter.allow(f"create:{client_ip}", limit=20, window_seconds=60 * 60):
 			raise HTTPException(status_code=429, detail="rate_limited")
-		# unique code
 		code = generate_short_code()
-		# naive collision handling
 		while session.exec(select(Poll).where(Poll.code == code)).first() is not None:
 			code = generate_short_code()
 		poll = Poll(code=code, question=question.strip(), locale=lang)
@@ -107,7 +130,7 @@ def create_app() -> FastAPI:
 		if not poll:
 			return templates.TemplateResponse(
 				"404.html",
-				{"request": request, "message": t(lang, "poll_not_found"), "t": lambda k: t(lang, k)},
+				{"request": request, "message": t(lang, "poll_not_found"), "t": lambda k: t(lang, k), "lang": lang},
 				status_code=404,
 			)
 		options = list(session.exec(select(Option).where(Option.poll_id == poll.id)))
@@ -125,6 +148,7 @@ def create_app() -> FastAPI:
 				"poll": poll,
 				"options": options,
 				"current_vote": current_vote,
+				"lang": lang,
 			},
 		)
 
@@ -155,7 +179,6 @@ def create_app() -> FastAPI:
 		if not poll:
 			raise HTTPException(status_code=404, detail="not_found")
 		options = list(session.exec(select(Option).where(Option.poll_id == poll.id)))
-		# counts
 		counts = {opt.id: 0 for opt in options}
 		for opt in options:
 			count = session.exec(select(Vote).where(Vote.poll_id == poll.id, Vote.option_id == opt.id)).all()
@@ -167,15 +190,19 @@ def create_app() -> FastAPI:
 	def trending(request: Request, session=Depends(get_session)):
 		lang = detect_language(request)
 		cutoff = dt.datetime.utcnow() - dt.timedelta(days=1)
-		polls = list(session.exec(select(Poll).where(Poll.created_at >= cutoff).order_by(Poll.created_at.desc()).limit(50)))
+		polls_recent = list(session.exec(select(Poll).order_by(Poll.created_at.desc()).limit(100)))
+		vote_counts = {}
+		for p in polls_recent:
+			count = session.exec(select(Vote).where(Vote.poll_id == p.id, Vote.created_at >= cutoff)).all()
+			vote_counts[p.code] = len(count)
+		polls = sorted(polls_recent, key=lambda p: (vote_counts.get(p.code, 0), p.created_at), reverse=True)
 		return templates.TemplateResponse(
 			"trending.html",
-			{"request": request, "t": lambda k: t(lang, k), "polls": polls},
+			{"request": request, "t": lambda k: t(lang, k), "polls": polls, "lang": lang},
 		)
 
 	@app.get("/random")
 	def random_poll(session=Depends(get_session)):
-		# pick latest 100 and choose one pseudo-randomly
 		polls = list(session.exec(select(Poll).order_by(Poll.created_at.desc()).limit(100)))
 		if not polls:
 			raise HTTPException(status_code=404, detail="no_polls")
@@ -183,7 +210,6 @@ def create_app() -> FastAPI:
 		poll = random.choice(polls)
 		return RedirectResponse(url=f"/p/{poll.code}")
 
-	# JSON API
 	@app.post("/api/polls")
 	def api_create_poll(payload: dict, request: Request, session=Depends(get_session)):
 		question = str(payload.get("question", "")).strip()

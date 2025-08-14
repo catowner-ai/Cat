@@ -16,7 +16,13 @@
 	<div class="mt-8">
 		<h2 class="text-xl font-bold mb-2">{{ t('results') }}</h2>
 		<div id="results" class="space-y-2"></div>
-		<div class="text-sm text-gray-500 mt-2">{{ t('share_link') }}: <code class="bg-gray-100 px-2 py-1 rounded">{{ request.url }}</code></div>
+		<div class="text-sm text-gray-500 mt-2 flex items-center gap-3 flex-wrap">
+			<span>{{ t('share_link') }}:</span>
+			<code id="share-url" class="bg-gray-100 px-2 py-1 rounded">{{ request.url }}</code>
+			<button id="copy-btn" class="text-indigo-600 font-semibold">Copy</button>
+			<button id="share-btn" class="text-indigo-600 font-semibold">Share</button>
+			<img alt="QR" class="h-8 w-8" src="https://api.qrserver.com/v1/create-qr-code/?size=128x128&data={{ request.url | urlencode }}"/>
+		</div>
 	</div>
 	<script>
 	async function fetchResults() {
@@ -46,12 +52,26 @@
 		const formData = new FormData(form);
 		const res = await fetch(form.action, { method: 'POST', body: formData, redirect: 'follow' });
 		if (res.redirected) {
-			// follow redirect and refresh results
 			window.history.replaceState({}, '', res.url);
 			fetchResults();
 			if (window.confetti) {
 				window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
 			}
+		}
+	});
+
+	document.getElementById('copy-btn').addEventListener('click', async (e) => {
+		e.preventDefault();
+		const url = document.getElementById('share-url').textContent;
+		try { await navigator.clipboard.writeText(url); } catch {}
+	});
+	document.getElementById('share-btn').addEventListener('click', async (e) => {
+		e.preventDefault();
+		const url = document.getElementById('share-url').textContent;
+		if (navigator.share) {
+			try { await navigator.share({ title: 'PulsePoll', url }); } catch {}
+		} else {
+			try { await navigator.clipboard.writeText(url); } catch {}
 		}
 	});
 	</script>
