@@ -46,6 +46,8 @@ Response:
 ## Results
 GET `/p/{code}/results`
 
+- Supports conditional requests via `ETag` and `If-None-Match`
+
 Response:
 ```json
 {
@@ -58,6 +60,25 @@ Response:
 }
 ```
 
+## Server-Sent Events (Realtime)
+GET `/p/{code}/events`
+
+- Media type: `text/event-stream`
+- Emits results payload every ~2s for ~4 minutes
+data lines example:
+```
+data: {"total": 3, "options": [{"id":1,"text":"A","count":1}, ...]}
+```
+
+## Export CSV
+GET `/p/{code}/export.csv`
+- Downloads a CSV file of aggregated results
+
+## Embed View
+GET `/e/{code}`
+- Minimal HTML suitable for iframes to display live results
+
 Notes:
-- Cookie `voter_id` 用於限制同一投票者在同一投票中只記錄一筆選擇（可更新選擇）。
-- Rate limit: 建立投票 API 每小時每 IP 100 次；頁面表單為每小時 20 次。
+- Cookie `voter_id` 限制同一投票者僅記錄一筆選擇（可更新）
+- Rate limit: 建立投票 API 每小時每 IP 100 次；頁面表單為每小時 20 次
+- `X-Forwarded-For` 用於代理後的 IP 解析

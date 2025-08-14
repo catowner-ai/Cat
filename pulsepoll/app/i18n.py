@@ -24,6 +24,12 @@ _STRINGS: Dict[str, Dict[str, str]] = {
 		"option_placeholder": "Option",
 		"enter_question": "Enter your question",
 		"poll_not_found": "Poll not found",
+		"copy": "Copy",
+		"share": "Share",
+		"export_csv": "Export CSV",
+		"embed": "Embed",
+		"copied": "Copied!",
+		"go_home": "Go Home",
 	},
 	"zh-TW": {
 		"app_name": "PulsePoll",
@@ -45,6 +51,12 @@ _STRINGS: Dict[str, Dict[str, str]] = {
 		"option_placeholder": "選項",
 		"enter_question": "請輸入你的問題",
 		"poll_not_found": "找不到投票",
+		"copy": "複製",
+		"share": "分享",
+		"export_csv": "匯出 CSV",
+		"embed": "嵌入",
+		"copied": "已複製！",
+		"go_home": "回首頁",
 	},
 }
 

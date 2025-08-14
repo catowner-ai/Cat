@@ -19,15 +19,15 @@
 		<div class="text-sm text-gray-500 mt-2 flex items-center gap-3 flex-wrap">
 			<span>{{ t('share_link') }}:</span>
 			<code id="share-url" class="bg-gray-100 px-2 py-1 rounded">{{ request.url }}</code>
-			<button id="copy-btn" class="text-indigo-600 font-semibold">Copy</button>
-			<button id="share-btn" class="text-indigo-600 font-semibold">Share</button>
+			<button id="copy-btn" class="text-indigo-600 font-semibold">{{ t('copy') }}</button>
+			<button id="share-btn" class="text-indigo-600 font-semibold">{{ t('share') }}</button>
+			<a href="/p/{{ poll.code }}/export.csv" class="text-indigo-600 font-semibold">{{ t('export_csv') }}</a>
+			<a href="/e/{{ poll.code }}" class="text-indigo-600 font-semibold" target="_blank" rel="noopener">{{ t('embed') }}</a>
 			<img alt="QR" class="h-8 w-8" src="https://api.qrserver.com/v1/create-qr-code/?size=128x128&data={{ request.url | urlencode }}"/>
 		</div>
 	</div>
 	<script>
-	async function fetchResults() {
-		const res = await fetch('/p/{{ poll.code }}/results');
-		const data = await res.json();
+	function renderResults(data) {
 		const total = data.total || 0;
 		const container = document.getElementById('results');
 		container.innerHTML = '';
@@ -43,8 +43,22 @@
 			container.appendChild(row);
 		}
 	}
-	fetchResults();
-	setInterval(fetchResults, 2000);
+
+	async function fetchResultsOnce() {
+		const res = await fetch('/p/{{ poll.code }}/results', { headers: { 'cache-control': 'no-cache' } });
+		if (res.status === 200) { renderResults(await res.json()); }
+	}
+
+	if (!!window.EventSource) {
+		const es = new EventSource('/p/{{ poll.code }}/events');
+		es.onmessage = (e) => {
+			try { const data = eval('(' + e.data + ')'); renderResults(data); } catch {}
+		};
+		es.onerror = () => { es.close(); setInterval(fetchResultsOnce, 2000); };
+	} else {
+		setInterval(fetchResultsOnce, 2000);
+	}
+	fetchResultsOnce();
 
 	document.getElementById('vote-form').addEventListener('submit', async (e) => {
 		e.preventDefault();
@@ -53,7 +67,7 @@
 		const res = await fetch(form.action, { method: 'POST', body: formData, redirect: 'follow' });
 		if (res.redirected) {
 			window.history.replaceState({}, '', res.url);
-			fetchResults();
+			fetchResultsOnce();
 			if (window.confetti) {
 				window.confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
 			}
@@ -63,7 +77,7 @@
 	document.getElementById('copy-btn').addEventListener('click', async (e) => {
 		e.preventDefault();
 		const url = document.getElementById('share-url').textContent;
-		try { await navigator.clipboard.writeText(url); } catch {}
+		try { await navigator.clipboard.writeText(url); alert('{{ t('copied') }}'); } catch {}
 	});
 	document.getElementById('share-btn').addEventListener('click', async (e) => {
 		e.preventDefault();
@@ -71,7 +85,7 @@
 		if (navigator.share) {
 			try { await navigator.share({ title: 'PulsePoll', url }); } catch {}
 		} else {
-			try { await navigator.clipboard.writeText(url); } catch {}
+			try { await navigator.clipboard.writeText(url); alert('{{ t('copied') }}'); } catch {}
 		}
 	});
 	</script>

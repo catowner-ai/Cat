@@ -1,8 +1,9 @@
-const CACHE = 'pulsepoll-v1';
+const CACHE = 'pulsepoll-v2';
 const ASSETS = [
 	'/static/app.js',
 	'/static/manifest.webmanifest',
-	'/static/logo.svg'
+	'/static/logo.svg',
+	'/offline'
 ];
 self.addEventListener('install', (event) => {
 	event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
@@ -21,6 +22,11 @@ self.addEventListener('fetch', (event) => {
 				caches.open(CACHE).then(cache => cache.put(req, copy)).catch(() => {});
 			}
 			return netRes;
+		}).catch(() => {
+			if (req.headers.get('accept')?.includes('text/html')) {
+				return caches.match('/offline');
+			}
+			return new Response('', { status: 502 });
 		}))
 	);
 });

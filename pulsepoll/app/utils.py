@@ -4,6 +4,8 @@ import random
 import string
 import time
 import uuid
+import hashlib
+import json
 from typing import Dict, Optional, Tuple
 
 from fastapi import Request, Response
@@ -54,3 +56,16 @@ class SimpleRateLimiter:
 			return False
 		self._store[k] = (count + 1, now)
 		return True
+
+
+def get_client_ip(request: Request) -> str:
+	xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+	if xff:
+		# take first IP
+		return xff.split(",")[0].strip()
+	return request.client.host if request.client else "anon"
+
+
+def compute_etag(obj: object) -> str:
+	payload = json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
+	return 'W/"' + hashlib.sha1(payload).hexdigest() + '"'
