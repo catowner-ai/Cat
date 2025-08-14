@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 const PWAInstall = dynamic(() => import('./PWAInstall'), { ssr: false });
 const InviteQR = dynamic(() => import('./InviteQR'), { ssr: false });
 const SharePoster = dynamic(() => import('./SharePoster'), { ssr: false });
+import { useBeep } from './useSound';
+import { useConfetti } from './useConfetti';
 
 type BingoItem = { id: string; label: string; found: boolean };
 
@@ -134,6 +136,8 @@ export default function Home() {
   const [showInvite, setShowInvite] = useState<boolean>(false);
   const [showPoster, setShowPoster] = useState<boolean>(false);
   const [matchInfo, setMatchInfo] = useState<string>('');
+  const beep = useBeep();
+  const confetti = useConfetti();
   const [pet, setPet] = useState<Pet | null>(null);
   const [petLoading, setPetLoading] = useState<boolean>(false);
   const [petNameInput, setPetNameInput] = useState<string>('');
@@ -278,6 +282,7 @@ export default function Home() {
   };
 
   const onTileToggle = (id: string) => {
+    beep(880, 70);
     setBoard((prev) => prev.map((t) => (t.id === id ? { ...t, found: !t.found } : t)));
     setTimeout(async () => {
       const lines = countCompletedLines(
@@ -310,6 +315,8 @@ export default function Home() {
           fetch('/api/achievements', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: nickname, ...a })
           }).catch(() => {});
+          confetti();
+          beep(1200, 120);
         }
       }
     }, 0);
@@ -456,7 +463,7 @@ export default function Home() {
               <div>
                 {t('progress')}: {foundCount} / 25 · {t('lines')}: {lineCount}
               </div>
-              <button onClick={onShare} className="px-3 py-1.5 rounded-md border">
+              <button onClick={async () => { await onShare(); beep(780, 90); }} className="px-3 py-1.5 rounded-md border">
                 {t('share')}
               </button>
               <button onClick={() => setShowPoster(true)} className="px-3 py-1.5 rounded-md border">
@@ -505,17 +512,19 @@ export default function Home() {
                     onClick={async () => {
                       const r = await fetch(`/api/snapswap/match?playerId=${encodeURIComponent(nickname || 'guest')}&roomId=${encodeURIComponent(roomId)}`);
                       const d = await r.json();
-                      if (d.ready) {
-                        setPeerImage(d.partner.image);
-                        setMatchInfo('Matched with ' + (d.partner.playerId || 'someone'));
-                        if (nickname) {
-                          fetch('/api/pet', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 8, happiness: 4 }),
-                          }).then(refreshPet).catch(() => {});
-                        }
-                      } else {
+                                             if (d.ready) {
+                         setPeerImage(d.partner.image);
+                         setMatchInfo('Matched with ' + (d.partner.playerId || 'someone'));
+                         confetti();
+                         beep(660, 140);
+                         if (nickname) {
+                           fetch('/api/pet', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ playerId: nickname, action: 'grant', xp: 8, happiness: 4 }),
+                           }).then(refreshPet).catch(() => {});
+                         }
+                       } else {
                         setMatchInfo('Not ready yet, try again in a moment.');
                       }
                     }}
