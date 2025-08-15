@@ -7,6 +7,8 @@ const InviteQR = dynamic(() => import('./InviteQR'), { ssr: false });
 const SharePoster = dynamic(() => import('./SharePoster'), { ssr: false });
 import { useBeep } from './useSound';
 import { useConfetti } from './useConfetti';
+import { usePresence } from './usePresence';
+import RoomPresenceBadge from './RoomPresenceBadge';
 
 type BingoItem = { id: string; label: string; found: boolean };
 
@@ -420,6 +422,7 @@ export default function Home() {
         <div className="flex items-center gap-1 text-sm">
           <input value={nickname} onChange={(e) => setNickname(e.target.value.slice(0,24))} placeholder="nickname" className="px-2 py-1 rounded border bg-transparent" />
           <input value={roomId} onChange={(e) => setRoomId(e.target.value.slice(0,32))} placeholder="room" className="px-2 py-1 rounded border bg-transparent w-28" />
+          <RoomPresenceBadge roomId={roomId} nickname={nickname} />
           <button
             onClick={() => setShowInvite(true)}
             className="px-2 py-1 rounded border"
