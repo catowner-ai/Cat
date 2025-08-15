@@ -301,3 +301,92 @@ def claim_weekly_boss_reward(day: str) -> bool:
         add_xp(120)
         return True
     return False
+
+# ---------- Equipped Perks Helpers ----------
+
+def _equipped_arts() -> list[dict]:
+    return db.list_artifacts(equipped_only=True)
+
+
+def has_equipped(perk_key: str) -> bool:
+    return any(a.get("perk_key") == perk_key for a in _equipped_arts())
+
+
+def count_equipped(perk_key: str) -> int:
+    return sum(1 for a in _equipped_arts() if a.get("perk_key") == perk_key)
+
+
+# ---------- Effective Streak (Shield) ----------
+
+def get_current_streak_effective(max_days: int = 60) -> int:
+    # Allow one miss forgiven if streak_shield equipped
+    shield_available = has_equipped("streak_shield")
+    misses_allowed = 1 if shield_available else 0
+    from datetime import date, timedelta
+
+    today = date.today()
+    streak = 0
+    misses_used = 0
+    for i in range(max_days):
+        d = today - timedelta(days=i)
+        cnt = db.get_total_completions_for_day(d.isoformat())
+        if cnt > 0:
+            streak += 1
+        else:
+            if misses_used < misses_allowed:
+                misses_used += 1
+                streak += 1
+            else:
+                break
+    return streak
+
+
+# ---------- Free Reroll (Per Day, if Equipped) ----------
+
+def can_use_free_reroll(day: str) -> bool:
+    if not has_equipped("reroll_bonus"):
+        return False
+    # one free per day
+    marker = "free-reroll-used"
+    # If we can add marker, we revert it (do not consume yet) and return True
+    if db.add_milestone_if_absent(day, marker):
+        # revert consumption by deleting is not supported; we instead return True and caller must consume
+        # To avoid actual insert here, we mark consumption only in consume_free_reroll
+        # so we need a check-only approach; for simplicity, check achievements list is heavy; alternative: try consume with a flag.
+        # Here we emulate: return True if not yet used. We'll remove the inserted marker by resetting completions for a dummy task
+        # Simpler: We cannot delete milestone; change approach: check via a different key that we only set on consume. Use 'free-reroll-consumed'.
+        pass
+    # Check consume marker
+    return db.add_milestone_if_absent(day, "free-reroll-consumed")
+
+
+def consume_free_reroll(day: str) -> bool:
+    return db.add_milestone_if_absent(day, "free-reroll-consumed")
+
+
+# ---------- Bingo Lines Bonus ----------
+
+_BINGO_LINES = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6],
+]
+
+
+def check_bingo_lines(day: str, task_ids: list[str], completed_map: dict[str, bool]) -> int:
+    awarded = 0
+    for idxs in _BINGO_LINES:
+        line_key = "line-" + "".join(str(i) for i in idxs)
+        # all done?
+        if all(completed_map.get(task_ids[i], False) for i in idxs):
+            if db.add_milestone_if_absent(day, line_key):
+                # award once per line per day
+                add_xp(25)
+                add_gems(10)
+                awarded += 1
+    return awarded

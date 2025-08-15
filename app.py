@@ -59,18 +59,26 @@ def main() -> None:
 
     # Reroll button
     if st.sidebar.button(i18n.t(locale, "reroll"), use_container_width=True):
-        # paid reroll with discount from talents (min 1 gem)
-        base_cost = 3
-        discount = int(gamify.get_talents().get("elemental_attunement", 0))
-        cost = max(1, base_cost - discount)
-        if gamify.spend_gems(cost):
+        # free reroll if equipped and unused today
+        if gamify.has_equipped("reroll_bonus") and gamify.consume_free_reroll(day_str):
             seed = random.randint(100000, 999999)
             new_task_ids = tasks.generate_board(seed=seed, locale=locale)
             board = db.update_board_reroll(day=day_str, tasks=new_task_ids, seed=seed)
             db.reset_day_completions(day=day_str, task_ids=new_task_ids)
             st.toast(i18n.t(locale, "board_rerolled"))
         else:
-            st.sidebar.error("Not enough gems for reroll")
+            # paid reroll with discount from talents (min 1 gem)
+            base_cost = 3
+            discount = int(gamify.get_talents().get("elemental_attunement", 0))
+            cost = max(1, base_cost - discount)
+            if gamify.spend_gems(cost):
+                seed = random.randint(100000, 999999)
+                new_task_ids = tasks.generate_board(seed=seed, locale=locale)
+                board = db.update_board_reroll(day=day_str, tasks=new_task_ids, seed=seed)
+                db.reset_day_completions(day=day_str, task_ids=new_task_ids)
+                st.toast(i18n.t(locale, "board_rerolled"))
+            else:
+                st.sidebar.error("Not enough gems for reroll")
 
     st.sidebar.caption(f"{i18n.t(locale, 'seed_label')}: {board['seed']}  •  {i18n.t(locale, 'rerolls_label')}: {board['rerolls']}")
 
@@ -124,15 +132,18 @@ def main() -> None:
                     gamify.award_task_once(day_str, task_id, base_xp=12, gem_reward=3)
                     recent = db.get_recent_completed(day_str, limit=2)
                     gamify.apply_combo_bonus(day_str, recent)
+                    # bingo lines check
+                    gamify.check_bingo_lines(day_str, task_ids, comp_map)
             if comp_map.get(task_id):
                 completed_count += 1
 
     # Stats + Profile
     col_a, col_b, col_c = st.columns(3)
     streak = db.get_current_streak()
+    streak_eff = gamify.get_current_streak_effective()
     profile = db.get_profile()
     level, xp_in_level, cap = gamify.level_from_total_xp(profile["xp"] if profile else 0)
-    col_a.metric(i18n.t(locale, "streak_label"), f"{streak}")
+    col_a.metric(i18n.t(locale, "streak_label"), f"{streak} (eff {streak_eff})")
     col_b.metric("LV / XP", f"Lv.{level}  {xp_in_level}/{cap}")
     col_c.metric("Gems", f"{profile['gems'] if profile else 0}")
     with st.expander("Talents", expanded=False):
@@ -158,6 +169,17 @@ def main() -> None:
     values = [v for _, v in stats]
     st.area_chart(values, height=140)
     st.caption(i18n.t(locale, "last_14_days"))
+
+    # 90-day mini heatmap-like grid (textual)
+    with st.expander("90-day activity", expanded=False):
+        day_list = utils.last_n_days(90)
+        rows = []
+        for i in range(0, 90, 30):
+            seg = day_list[i:i+30]
+            row_str = " ".join(["▮" if db.get_total_completions_for_day(d) > 0 else "▪" for d in seg])
+            rows.append(row_str)
+        for r in rows:
+            st.text(r)
 
     # Weekly Boss
     with st.expander("Weekly Boss", expanded=False):

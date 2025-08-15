@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime, date
 import json
 from typing import Any
+from datetime import timedelta
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,3 +42,8 @@ def json_dumps(data: Any) -> str:
 
 def json_loads(s: str) -> Any:
     return json.loads(s)
+
+
+def last_n_days(n: int) -> list[str]:
+    from datetime import date as _date
+    return [(_date.today() - timedelta(days=i)).isoformat() for i in range(n - 1, -1, -1)]
