@@ -255,6 +255,19 @@ export default function App() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    const i = setInterval(async () => {
+      if (activeTab === 'quest') {
+        try {
+          const r = await fetch(`${API_BASE}/api/chat?room=${encodeURIComponent(roomId)}`);
+          const d = await r.json();
+          setMessages(d.messages || []);
+        } catch {}
+      }
+    }, 5000);
+    return () => clearInterval(i);
+  }, [activeTab, roomId]);
+
   const PetFace = ({ type }: { type: PetType }) => {
     const map: Record<PetType, string> = { cat: '🐱', dog: '🐶', fox: '🦊', panda: '🐼', dragon: '🐲' };
     return <Text style={{ fontSize: 48 }}>{map[type] || '🐾'}</Text>;
