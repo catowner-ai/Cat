@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ThemeToggle from './ThemeToggle';
+import SoundToggle from './sound/SoundToggle';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -57,6 +58,7 @@ export default function RootLayout({
             <div className="font-semibold tracking-tight">QuestBingo</div>
             <div className="flex items-center gap-2">
               <div className="text-sm opacity-70 hidden sm:block">Walk • Snap • Play</div>
+              <SoundToggle />
               <ThemeToggle />
             </div>
           </div>

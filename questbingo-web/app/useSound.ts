@@ -2,6 +2,8 @@
 
 import { useCallback, useRef } from 'react';
 
+import { useSoundPref } from './useSoundPref';
+
 export function useBeep() {
   const ctxRef = useRef<AudioContext | null>(null);
   const getCtx = () => {
@@ -12,7 +14,9 @@ export function useBeep() {
     ctxRef.current = new CtxCtor();
     return ctxRef.current;
   };
+  const { muted } = useSoundPref();
   return useCallback((freq = 880, durationMs = 90) => {
+    if (muted) return;
     try {
       const ctx = getCtx();
       const o = ctx.createOscillator();
