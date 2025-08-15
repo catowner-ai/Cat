@@ -22,22 +22,21 @@ def _load_font(size: int) -> ImageFont.ImageFont:
 
 
 def _wrap(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> List[str]:
-    words = text.split()
-    if len(words) <= 1:
-        return [text]
+    # Try to break on punctuation and spaces for multilingual
+    seps = [' ', '、', '，', '。', '・', '/']
     lines: List[str] = []
-    current = ""
-    for word in words:
-        trial = f"{current} {word}".strip()
+    current = ''
+    for ch in text:
+        trial = (current + ch)
         w, _ = draw.textsize(trial, font=font)
         if w <= max_width:
             current = trial
         else:
             if current:
-                lines.append(current)
-            current = word
+                lines.append(current.rstrip())
+            current = ch
     if current:
-        lines.append(current)
+        lines.append(current.rstrip())
     return lines
 
 

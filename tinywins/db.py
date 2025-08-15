@@ -96,6 +96,28 @@ def init_db() -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS achievements (
+            key TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            reward_xp INTEGER NOT NULL DEFAULT 0,
+            reward_gems INTEGER NOT NULL DEFAULT 0,
+            unlocked_at TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wish_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            rarity TEXT NOT NULL,
+            perk_key TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -366,3 +388,90 @@ def set_talent_level(key: str, level: int) -> None:
         (key, int(level), utils.now_str()),
     )
     conn.commit()
+
+
+def add_achievement_if_absent(key: str, name: str, reward_xp: int, reward_gems: int) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO achievements(key, name, reward_xp, reward_gems, unlocked_at) VALUES (?, ?, ?, ?, ?)",
+            (key, name, int(reward_xp), int(reward_gems), utils.now_str()),
+        )
+        conn.commit()
+        return True
+    except Exception:
+        return False
+
+
+def list_achievements(limit: int | None = None) -> list[dict]:
+    conn = get_connection()
+    cur = conn.cursor()
+    q = "SELECT key, name, reward_xp, reward_gems, unlocked_at FROM achievements ORDER BY unlocked_at DESC"
+    if limit:
+        rows = cur.execute(q + " LIMIT ?", (int(limit),)).fetchall()
+    else:
+        rows = cur.execute(q).fetchall()
+    return [dict(r) for r in rows]
+
+
+def log_wish(name: str, rarity: str, perk_key: str) -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO wish_logs(name, rarity, perk_key, created_at) VALUES (?, ?, ?, ?)",
+        (name, rarity, perk_key, utils.now_str()),
+    )
+    conn.commit()
+
+
+def list_wish_logs(limit: int = 50) -> list[dict]:
+    conn = get_connection()
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT id, name, rarity, perk_key, created_at FROM wish_logs ORDER BY id DESC LIMIT ?",
+        (int(limit),),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_last_n_days_completed_pairs(n: int = 30) -> list[dict]:
+    from datetime import datetime
+    today = date.today()
+    conn = get_connection()
+    cur = conn.cursor()
+    pairs: list[dict] = []
+    for i in range(n):
+        d = today - timedelta(days=i)
+        day_str = d.isoformat()
+        rows = cur.execute(
+            "SELECT task_id FROM completions WHERE day = ? AND completed = 1",
+            (day_str,),
+        ).fetchall()
+        for r in rows:
+            pairs.append({"day": day_str, "task_id": r["task_id"]})
+    return pairs
+
+
+def export_all_json_bytes() -> bytes:
+    conn = get_connection()
+    cur = conn.cursor()
+    all_data = {}
+    for table in [
+        "boards",
+        "completions",
+        "profile",
+        "milestones",
+        "artifacts",
+        "gacha_state",
+        "talents",
+        "achievements",
+        "wish_logs",
+    ]:
+        try:
+            rows = cur.execute(f"SELECT * FROM {table}").fetchall()
+            all_data[table] = [dict(r) for r in rows]
+        except Exception:
+            all_data[table] = []
+    import json as _json
+    return _json.dumps(all_data, ensure_ascii=False, indent=2).encode("utf-8")

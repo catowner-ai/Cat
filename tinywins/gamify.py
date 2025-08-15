@@ -157,6 +157,8 @@ def wish(rng_seed: Optional[int] = None, count: int = 1) -> List[Dict]:
             data_json=utils.json_dumps(art_template.get("data", {})),
         )
         results.append(db.get_artifact_by_id(art_id))
+        # log wish
+        db.log_wish(art_template["name"], art_template["rarity"], art_template["perk_key"])
         # update pity
         if chosen_rarity == "epic":
             pity_epic = 0

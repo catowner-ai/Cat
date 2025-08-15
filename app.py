@@ -164,10 +164,14 @@ def main() -> None:
     with st.expander("Wishing (Gacha)", expanded=False):
         state = db.get_gacha_state()
         st.caption(f"Pity — Rare: {state['pity_rare']}/10, Epic: {state['pity_epic']}/50")
-        colw1, colw2 = st.columns([1, 2])
+        colw1, colw2, colw3 = st.columns([1, 1, 1])
         count = colw1.selectbox("Count", options=[1, 10], index=0)
-        cost = 8 * count
-        if colw2.button(f"Wish x{count} (cost {cost} gems)"):
+        base_cost = 8
+        talents = gamify.get_talents()
+        discount = int(talents.get("elemental_attunement", 0))  # 1 gem off per level
+        cost = max(1, (base_cost - discount)) * count
+        colw2.caption(f"Cost: {cost}")
+        if colw3.button(f"Wish x{count}"):
             if gamify.spend_gems(cost):
                 results = gamify.wish(count=count)
                 st.success(f"Obtained {len(results)} artifact(s)")
@@ -182,6 +186,10 @@ def main() -> None:
                 if st.button(f"{'[E] ' if equipped else ''}[{a['rarity']}] {a['name']}", key=f"art-{a['id']}"):
                     db.set_artifact_equipped(a['id'], not equipped)
                     st.experimental_rerun()
+        st.caption("Wish logs")
+        logs = db.list_wish_logs(50)
+        for log in logs:
+            st.write(f"[{log['rarity']}] {log['name']} • {log['perk_key']} • {log['created_at']}")
 
     # Downloads
     tasks_and_status = [(texts[i], bool(comp_map.get(task_ids[i], False))) for i in range(9)]
@@ -213,6 +221,17 @@ def main() -> None:
         mime="text/calendar",
         use_container_width=True,
     )
+
+    # Export data JSON
+    if st.button("Export JSON data"):
+        data_bytes = db.export_all_json_bytes()
+        st.download_button(
+            label="Download export.json",
+            data=data_bytes,
+            file_name="tinywins-export.json",
+            mime="application/json",
+            use_container_width=True,
+        )
 
     st.caption(i18n.t(locale, "made_with_love"))
 
