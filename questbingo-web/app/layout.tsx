@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './sound/SoundToggle';
+import { ToastProvider } from './ui/Toast';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -63,7 +64,9 @@ export default function RootLayout({
             </div>
           </div>
         </header>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

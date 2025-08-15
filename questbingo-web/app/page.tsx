@@ -471,9 +471,20 @@ export default function Home() {
               <button onClick={async () => { await onShare(); beep(780, 90); }} className="px-3 py-1.5 rounded-md border">
                 {t('share')}
               </button>
-              <button onClick={() => setShowPoster(true)} className="px-3 py-1.5 rounded-md border">
-                Poster
-              </button>
+                        <button onClick={() => setShowPoster(true)} className="px-3 py-1.5 rounded-md border">
+            Poster
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomId)}`);
+                beep(820, 100);
+                // notify toast
+                (await import('./ui/Toast')).useToast().notify({ title: 'Link copied', variant: 'success' });
+              } catch {}
+            }}
+            className="px-3 py-1.5 rounded-md border"
+          >Copy link</button>
             </div>
         </section>
       ) : activeTab === 'snap' ? (
