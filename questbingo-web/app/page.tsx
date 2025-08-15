@@ -7,9 +7,9 @@ const InviteQR = dynamic(() => import('./InviteQR'), { ssr: false });
 const SharePoster = dynamic(() => import('./SharePoster'), { ssr: false });
 import { useBeep } from './useSound';
 import { useConfetti } from './useConfetti';
-import { usePresence } from './usePresence';
 import RoomPresenceBadge from './RoomPresenceBadge';
 import AchievementsWidget from './achievements/Widget';
+import QuestLeaderboards from './QuestLeaderboards';
 
 type BingoItem = { id: string; label: string; found: boolean };
 
@@ -595,6 +595,7 @@ export default function Home() {
                 <li className="text-xs opacity-60">No entries yet. Be the first!</li>
               )}
             </ul>
+            <QuestLeaderboards roomId={roomId} />
           </div>
         </section>
       ) : (
