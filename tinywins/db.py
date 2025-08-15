@@ -8,11 +8,18 @@ from datetime import date, timedelta
 from . import utils
 
 
+# Cache a single connection for performance
+_CONN: Optional[sqlite3.Connection] = None
+
+
 def get_connection() -> sqlite3.Connection:
+    global _CONN
+    if _CONN is not None:
+        return _CONN
     utils.ensure_data_dir()
-    conn = sqlite3.connect(str(utils.get_db_path()), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    _CONN = sqlite3.connect(str(utils.get_db_path()), check_same_thread=False)
+    _CONN.row_factory = sqlite3.Row
+    return _CONN
 
 
 def init_db() -> None:
@@ -475,3 +482,24 @@ def export_all_json_bytes() -> bytes:
             all_data[table] = []
     import json as _json
     return _json.dumps(all_data, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def count_wish_logs() -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT COUNT(*) FROM wish_logs").fetchone()
+    return int(row[0]) if row else 0
+
+
+def count_artifacts() -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT COUNT(*) FROM artifacts").fetchone()
+    return int(row[0]) if row else 0
+
+
+def get_total_completions_for_day(day: str) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    row = cur.execute("SELECT COUNT(*) FROM completions WHERE day = ? AND completed = 1", (day,)).fetchone()
+    return int(row[0]) if row else 0

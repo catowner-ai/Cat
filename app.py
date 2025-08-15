@@ -59,11 +59,18 @@ def main() -> None:
 
     # Reroll button
     if st.sidebar.button(i18n.t(locale, "reroll"), use_container_width=True):
-        seed = random.randint(100000, 999999)
-        new_task_ids = tasks.generate_board(seed=seed, locale=locale)
-        board = db.update_board_reroll(day=day_str, tasks=new_task_ids, seed=seed)
-        db.reset_day_completions(day=day_str, task_ids=new_task_ids)
-        st.toast(i18n.t(locale, "board_rerolled"))
+        # paid reroll with discount from talents (min 1 gem)
+        base_cost = 3
+        discount = int(gamify.get_talents().get("elemental_attunement", 0))
+        cost = max(1, base_cost - discount)
+        if gamify.spend_gems(cost):
+            seed = random.randint(100000, 999999)
+            new_task_ids = tasks.generate_board(seed=seed, locale=locale)
+            board = db.update_board_reroll(day=day_str, tasks=new_task_ids, seed=seed)
+            db.reset_day_completions(day=day_str, task_ids=new_task_ids)
+            st.toast(i18n.t(locale, "board_rerolled"))
+        else:
+            st.sidebar.error("Not enough gems for reroll")
 
     st.sidebar.caption(f"{i18n.t(locale, 'seed_label')}: {board['seed']}  •  {i18n.t(locale, 'rerolls_label')}: {board['rerolls']}")
 
@@ -133,14 +140,14 @@ def main() -> None:
         cols_t = st.columns(2)
         with cols_t[0]:
             lvl = int(talents.get("combo_mastery", 0))
-            if st.button(f"Combo Mastery Lv.{lvl} (+{2*lvl}% XP)"):
+            if st.button(f"Combo Mastery Lv.{lvl} (+{2*lvl} XP bonus on combos)"):
                 if gamify.upgrade_talent("combo_mastery"):
                     st.success("Upgraded Combo Mastery")
                 else:
                     st.info("Cannot upgrade")
         with cols_t[1]:
             lvl = int(talents.get("elemental_attunement", 0))
-            if st.button(f"Elemental Attunement Lv.{lvl}"):
+            if st.button(f"Elemental Attunement Lv.{lvl} (gacha/reroll discount)"):
                 if gamify.upgrade_talent("elemental_attunement"):
                     st.success("Upgraded Elemental Attunement")
                 else:
@@ -154,11 +161,17 @@ def main() -> None:
 
     # Weekly Boss
     with st.expander("Weekly Boss", expanded=False):
+        st.caption("Clear your week and claim once")
         if st.button("Claim weekly reward"):
             if gamify.claim_weekly_boss_reward(day_str):
                 st.success("Weekly reward claimed")
             else:
                 st.info("Already claimed this week")
+
+    # Achievements
+    with st.expander("Achievements", expanded=False):
+        for a in db.list_achievements():
+            st.write(f"🏆 {a['name']}  • +{a['reward_xp']} XP, +{a['reward_gems']} Gems  • {a['unlocked_at']}")
 
     # Wish / Gacha
     with st.expander("Wishing (Gacha)", expanded=False):

@@ -116,8 +116,19 @@ def get_equipped_xp_bonus_pct() -> int:
 def award_task_once(day: str, task_id: str, base_xp: int = 10, gem_reward: int = 5) -> bool:
     key = f"award-{task_id}"
     if db.add_milestone_if_absent(day, key):
+        # dynamic reward: slight extra for full clears
         add_xp(base_xp)
         add_gems(gem_reward)
+        # achievements
+        total_done = db.get_total_completions_for_day(day)
+        if total_done == 1:
+            if db.add_achievement_if_absent("first-blood", "First completion today", 10, 5):
+                add_xp(10)
+                add_gems(5)
+        if total_done == 9:
+            if db.add_achievement_if_absent("bingo", "Full board clear", 40, 20):
+                add_xp(40)
+                add_gems(20)
         return True
     return False
 
