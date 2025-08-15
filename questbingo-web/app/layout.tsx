@@ -34,6 +34,7 @@ export default function RootLayout({
             <nav className="flex items-center gap-4 text-sm">
               <Link href="/" className="opacity-80 hover:opacity-100">Home</Link>
               <Link href="/shop" className="opacity-80 hover:opacity-100">Shop</Link>
+              <Link href="/achievements" className="opacity-80 hover:opacity-100">Achievements</Link>
             </nav>
           </div>
         </header>
